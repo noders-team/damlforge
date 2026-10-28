@@ -1,26 +1,111 @@
+<div align="center">
+
 # DamlForge
 
-DamlForge compiles `.vy` files (Python syntax, Vyper-flavored keywords) into real Daml/Canton `.daml` source. See [`.claude/skills/damlforge-vy-lang/`](.claude/skills/damlforge-vy-lang/SKILL.md) for the full language reference.
+**Write Daml smart contracts for Canton in Python syntax.**
 
-## User guide
+[![PyPI](https://img.shields.io/pypi/v/damlforge)](https://pypi.org/project/damlforge/)
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://pypi.org/project/damlforge/)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
-The guide in [`docs/guide/`](docs/guide) walks through DamlForge from setup to
-packaging. Every example in it compiles with `forge dar` and is covered by a
-passing Daml Script test.
+[User guide](https://docs.damlforge.noders.services) · [Examples](examples) · [Releases](https://github.com/noders-team/damlforge/releases)
+
+</div>
+
+DamlForge lets you write Canton smart contracts in `.vy` files. These use Python
+syntax with a few contract-specific (Vyper-flavored) keywords. The `forge` compiler turns each
+`.vy` file into ordinary Daml source, and DPM, the Daml package manager, builds,
+tests, and ships that source. Nothing in a `.vy` file runs as Python: the file is
+parsed, checked, and lowered straight to Daml.
+
+## How it works
+
+**1. Install DamlForge** (Python 3.11 or newer):
+
+```bash
+pip install damlforge
+```
+
+**2. Write a contract** in `Main.vy`:
+
+```python
+from forge.builtins.daml_lang import create
+from forge.models import ContractId, Party, choice, template
+
+
+@template
+class Asset:
+    issuer: Party
+    owner: Party
+    name: str
+
+    signatory: Party = issuer
+    observer: Party = owner
+    ensure: bool = name != ""
+
+    @choice(controller=owner, consuming=True)
+    def give(self, new_owner: Party) -> ContractId[Asset]:
+        return create(Asset(issuer=self.issuer, owner=new_owner, name=self.name))
+```
+
+**3. Compile it to Daml:**
+
+```bash
+forge daml Main.vy -o out/
+```
+
+`forge` generates `out/Main.daml`:
+
+```haskell
+module Main where
+
+template Asset
+  with
+    issuer : Party
+    owner : Party
+    name : Text
+  where
+    signatory issuer
+    observer owner
+    ensure name /= ""
+
+    choice Give : ContractId Asset
+      with
+        new_owner : Party
+      controller owner
+      do
+        let self = this
+        create (Asset with issuer = self.issuer, owner = new_owner, name = self.name)
+```
+
+**More:** see the [full documentation](#documentation), from setup to packaging.
+
+## Documentation
+
+The guide at [docs.damlforge.noders.services](https://docs.damlforge.noders.services)
+walks through DamlForge from setup to packaging. Every example in it compiles
+with `forge dar` and is covered by a passing Daml Script test.
 
 | # | Page | Covers |
 |---|---|---|
-| 1 | [Development Environment Setup](docs/guide/01-dev-environment.md) | Installing DPM and DamlForge, creating a project, editor setup, day-to-day commands |
-| 2 | [Language Fundamentals](docs/guide/02-language-fundamentals.md) | Types, structs, enums, variants, `Optional`, functions, control flow, dates, imports |
-| 3 | [Compiler Errors](docs/guide/03-compiler-errors.md) | Every `DF` error code, with the message, cause, and fix |
-| 4 | [Contract Templates](docs/guide/04-contract-templates.md) | Templates, signatories, observers, `ensure`, testing with Daml Script |
-| 5 | [Choices](docs/guide/05-choices.md) | Choices as methods and as delegation, updating a contract in place, consuming and non-consuming choices, a simple cash model |
-| 6 | [Design Patterns](docs/guide/06-design-patterns.md) | Propose-accept, delegation, authorization, locking, multi-party agreements |
-| 7 | [Working with Time](docs/guide/07-working-with-time.md) | `datetime` support, ledger time, deadlines and time windows, `setTime`/`passTime` |
-| 8 | [Contract Keys](docs/guide/08-contract-keys.md) | `key` and `maintainer`, by-key lookups, Daml 3.5 requirements |
-| 9 | [Interfaces](docs/guide/09-interfaces.md) | Declaring and implementing interfaces, views, converting contract IDs |
-| 10 | [Building and Packaging](docs/guide/10-building-packaging.md) | `forge dar`, `daml.yaml` settings, multi-package projects, DAR contents |
-| 11 | [Variants](docs/guide/11-variants.md) | Constructor styles, recursive and generic variants, current limitations |
+| 1 | [Development Environment Setup](https://docs.damlforge.noders.services/guide/dev-environment/) | Installing DPM and DamlForge, creating a project, editor setup, day-to-day commands |
+| 2 | [Language Fundamentals](https://docs.damlforge.noders.services/guide/language-fundamentals/) | Types, structs, enums, variants, `Optional`, functions, control flow, dates, imports |
+| 3 | [Compiler Errors](https://docs.damlforge.noders.services/guide/compiler-errors/) | Every `DF` error code, with the message, cause, and fix |
+| 4 | [Contract Templates](https://docs.damlforge.noders.services/guide/contract-templates/) | Templates, signatories, observers, `ensure`, testing with Daml Script |
+| 5 | [Choices](https://docs.damlforge.noders.services/guide/choices/) | Choices as methods and as delegation, updating a contract in place, consuming and non-consuming choices, a simple cash model |
+| 6 | [Design Patterns](https://docs.damlforge.noders.services/guide/design-patterns/) | Propose-accept, delegation, authorization, locking, multi-party agreements |
+| 7 | [Working with Time](https://docs.damlforge.noders.services/guide/working-with-time/) | `datetime` support, ledger time, deadlines and time windows, `setTime`/`passTime` |
+| 8 | [Contract Keys](https://docs.damlforge.noders.services/guide/contract-keys/) | `key` and `maintainer`, by-key lookups, Daml 3.5 requirements |
+| 9 | [Interfaces](https://docs.damlforge.noders.services/guide/interfaces/) | Declaring and implementing interfaces, views, converting contract IDs |
+| 10 | [Building and Packaging](https://docs.damlforge.noders.services/guide/building-packaging/) | `forge dar`, `daml.yaml` settings, multi-package projects, DAR contents |
+| 11 | [Variants](https://docs.damlforge.noders.services/guide/variants/) | Constructor styles, recursive and generic variants, current limitations |
+
+## Claude Code skill
+
+See [`.claude/skills/damlforge-vy-lang/`](.claude/skills/damlforge-vy-lang/SKILL.md)
+for the full language reference. It is also a Claude Code skill: Claude Code uses
+it to write, read, and review `.vy` files, translate `.daml` files to `.vy`, and
+explain `DF` compiler errors in this repository.
 
 ## Installing
 
@@ -32,7 +117,8 @@ source .venv/bin/activate          # .venv\Scripts\activate on Windows
 pip install damlforge
 ```
 
-### Using DamlForge in another project
+<details>
+<summary><b>Using DamlForge in another project</b> (pip, Poetry)</summary>
 
 Add DamlForge as a dependency of the project that holds your `.vy` contracts.
 
@@ -78,17 +164,35 @@ from forge.builtins.daml_lang import create
 from forge.models import Party, choice, template
 ```
 
-Splice stubs also need the matching Splice DAR in `data-dependencies` in `daml.yaml`. See [Development Environment Setup](docs/guide/01-dev-environment.md#as-a-dependency-of-your-own-project) and [Building and Packaging](docs/guide/10-building-packaging.md#using-other-packages-from-vy).
+Splice stubs also need the matching Splice DAR in `data-dependencies` in `daml.yaml`. See [Development Environment Setup](https://docs.damlforge.noders.services/guide/dev-environment/#as-a-dependency-of-your-own-project) and [Building and Packaging](https://docs.damlforge.noders.services/guide/building-packaging/#using-other-packages-from-vy).
 
-### Installing from GitHub Releases
+</details>
+
+<details>
+<summary><b>Installing from GitHub Releases</b></summary>
 
 Releases are also built by CI on every `v*.*.*` tag and attached to the corresponding [GitHub Release](https://github.com/noders-team/damlforge/releases) as `damlforge-<version>-py3-none-any.whl`, which installs with `pip install damlforge-<version>-py3-none-any.whl`.
+
+</details>
+
+<details>
+<summary><b>Upgrading</b></summary>
+
+Upgrade in place:
+
+```bash
+pip install -U damlforge==<new-version>
+```
+
+If you installed the old `forge` wheel from GitHub Releases, run `pip uninstall forge` first, since the distribution was renamed to `damlforge`.
+
+</details>
 
 ### Publishing to PyPI
 
 `.github/workflows/publish-pypi.yml` is started by hand from the Actions tab (**Run workflow**) with the version to publish. It builds the sdist and wheel with that version and uploads them through PyPI trusted publishing, so no API token is stored in the repository.
 
-## Using it
+## Commands
 
 Installing the wheel puts a `forge` command on your `PATH`. It's a [Click](https://click.palletsprojects.com/) CLI with a subcommand per compile target:
 
@@ -107,147 +211,21 @@ forge stubs input.dar -o generated/         # .dar -> generated .vy stubs
 ```
 
 `forge <path> [options]` (no subcommand) is shorthand for `forge daml <path> [options]`.
+`forge stubs` needs `pip install 'damlforge[stubgen]'`.
 
-`forge daml` writes a JSON source map next to each `.daml` file. Directory input is
-intentionally non-recursive; `forge dar` recursively compiles every `.vy` below the
-project's configured `source` directory. Use `--no-i` with `forge daml` to stop at the
-first compile error; the default is to continue with the remaining files. Add
-`--traceback` to any subcommand for a Python traceback instead of a short error message.
+See [Building and Packaging](https://docs.damlforge.noders.services/guide/building-packaging/) for `daml.yaml`
+requirements, DPM options, and stub generation.
 
-## Daml projects and DARs
+## Examples
 
-`forge dar` compiles into an existing Daml project. The project must contain a
-`daml.yaml` with `name`, `source`, `version`, and a non-empty `dependencies` list.
-`data-dependencies` are supported and are checked before invoking DPM. Generated
-`.daml` files are written under the configured source directory, then DamlForge runs
-`dpm build` to produce the DAR.
+The [`examples/`](examples) directory has complete projects to compile and study:
 
-By default DPM is searched for on `PATH`, then at `~/.dpm/bin/dpm`; use `--dpm PATH`
-when it is installed elsewhere. For example:
-
-```bash
-forge dar examples/splice-util-batched-markers \
-  -o examples/splice-util-batched-markers/splice-util-batched-markers-current.dar
-```
-
-When validating tests that exercise templates from data dependencies, use the Daml
-test runner's all-packages mode:
-
-```bash
-daml test --all
-```
-
-## Generating `.vy` stubs
-
-The optional stub generator reconstructs supported Daml-LF declarations from a DAR.
-Install its extra dependency with `pip install 'damlforge[stubgen]'`. It accepts either a
-DAR file or a Daml project directory (the latter is built with DPM first):
-
-```bash
-forge stubs path/to/package.dar -o generated/
-forge stubs path/to/daml_project -o generated/ --dpm /path/to/dpm
-forge stubs path/to/package.dar --module Some.Module --module Other.Module
-```
-
-The `--module` option may be repeated and selects modules from the main package or
-its dependencies. Unsupported declarations are skipped and reported by the command.
-
-## Variants
-
-Use `@variant` on a class to define a Daml variant. Each method declares one
-constructor; its parameters are the constructor payload:
-
-```python
-from datetime import datetime
-
-from forge.models import Party, variant_record
-
-@variant
-class Result:
-    def Accepted(value: Party): pass
-    def Cancelled(): pass
-
-    @variant_record
-    def Deferred(reason: str, retry_at: datetime): pass
-```
-
-This generates positional constructors for ordinary methods and a named-field
-constructor for the method marked `@variant_record`:
-
-```daml
-data Result
-  = Accepted Party
-  | Cancelled
-  | Deferred with
-      reason : Text
-      retry_at : Time
-  deriving (Eq, Show)
-```
-
-`@variant` is a DamlForge class marker, like `@template`, and does not need an
-import. `@variant_record` is an ordinary method decorator and must be imported.
-Use it only when the Daml constructor must use `with` fields; otherwise the
-parameter names are not part of the generated Daml API.
-
-Generated derivations follow `daml.yaml`: Daml 3.4 uses inferred serializability;
-Daml 3.5 adds `Serializable` only when `--explicit-serializable=yes` is enabled.
-
-See [Variants](docs/guide/11-variants.md) for constructing and comparing values,
-recursive and generic variants, and what isn't supported yet.
-
-## Enums
-
-Use Python's `Enum` syntax. Members must be bare names or use `auto()`; explicit
-values are rejected. Only member names become Daml constructors:
-
-```python
-from enum import Enum, auto
-
-class Status(Enum):
-    PENDING = auto()
-    COMPLETE = auto()
-```
-
-This generates `data Status = PENDING | COMPLETE` in Daml.
-
-## Dates and time
-
-Use Python's standard `datetime` types directly in `.vy` contracts; do not
-import `Date`, `Timestamp`, or `RelTime` from `forge.models`:
-
-```python
-from datetime import date, datetime, time, timedelta, timezone
-
-def epoch() -> date:
-    return date(1970, 1, 1)
-
-def next_week(start: datetime) -> datetime:
-    return start + timedelta(days=7)
-
-def midnight(value: date) -> datetime:
-    return datetime.combine(value, time())
-
-def from_seconds(seconds: int) -> datetime:
-    return datetime.fromtimestamp(seconds, timezone.utc)
-```
-
-`date`, `datetime`, and `timedelta` compile to Daml `Date`, `Time`, and
-`RelTime`. `datetime.now()` compiles to the Daml update operation `getTime`; DamlForge
-infers the enclosing function's `Update` return type automatically.
-
-Only these constructs are translated, not the whole `datetime` module. See
-[Working with Time](docs/guide/07-working-with-time.md) for the full list of
-supported forms, the `DA.Date` helpers to use instead of the rest, and ledger time.
-
-## Upgrading
-
-Upgrade in place:
-
-```bash
-pip install -U damlforge==<new-version>
-```
-
-If you installed the old `forge` wheel from GitHub Releases, run `pip uninstall forge` first, since the distribution was renamed to `damlforge`.
+| Example | Shows |
+|---|---|
+| [`examples/basic/`](examples/basic) | Templates, interfaces, cross-module imports |
+| [`examples/token_standard/`](examples/token_standard) | A Splice token-standard holding and transfer flow |
+| [`examples/crowd_loans/`](examples/crowd_loans) | Enums, `GenMap`, nested loops, Splice data dependencies |
+| [`examples/splice-util-batched-markers/`](examples/splice-util-batched-markers) | A Splice featured-app template with structs, choices, and Splice API data dependencies |
 
 ## Building the wheel yourself
 

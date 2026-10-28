@@ -20,6 +20,10 @@ the `.vy` contracts and a `test` package with Daml Script tests.
 | `dpm test` | Runs the Daml Script tests in the current package |
 | `dpm damlc inspect-dar <file.dar>` | Lists the files in a DAR |
 
+`forge daml` writes a JSON source map next to each `.daml` file. Directory input is
+intentionally non-recursive; `forge dar` recursively compiles every `.vy` below the
+project's configured `source` directory.
+
 ## What `forge dar` does
 
 1. **Reads `daml.yaml`.** The project needs `name`, `version`, `source`, and a
@@ -167,6 +171,18 @@ forge stubs main/.daml/dist/guide-main-0.0.1.dar -o stubs --module Coin
 
 It needs the `stubgen` extra (`pip install 'damlforge[stubgen]'`), and reads DARs for
 LF 2.1 to 2.3.
+
+It accepts either a DAR file or a Daml project directory (the latter is built with
+DPM first):
+
+```bash
+forge stubs path/to/package.dar -o generated/
+forge stubs path/to/daml_project -o generated/ --dpm /path/to/dpm
+forge stubs path/to/package.dar --module Some.Module --module Other.Module
+```
+
+The `--module` option may be repeated and selects modules from the main package or
+its dependencies. Unsupported declarations are skipped and reported by the command.
 
 ## Deciding what goes in a package
 

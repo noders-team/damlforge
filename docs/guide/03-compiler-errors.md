@@ -602,7 +602,7 @@ Values and type shapes that Daml can't represent.
 | ``datetime.date(...) year 10000 is out of range`` | A literal `date(...)` or `datetime(...)` outside `0001-01-01` to `9999-12-31` |
 
 Constant arithmetic is evaluated at compile time, so `2 ** 64` is caught too. The
-full set of bounds is in [Daml value policies](../daml-value-policies.md).
+full set of bounds is in [Daml value policies](../../forge/semantics/primitive_specs.py).
 
 **Fix:** keep literals within range and give each generic type the right number
 of type arguments: `GenMap[K, V]`, `TextMap[V]`, `list[T]`, `Optional[T]`,

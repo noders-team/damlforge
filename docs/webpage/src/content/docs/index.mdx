@@ -1,0 +1,82 @@
+---
+title: DamlForge
+description: Write Daml smart contracts for Canton in Python syntax.
+hero:
+  tagline: Write Daml smart contracts for Canton in Python syntax.
+  actions:
+    - text: User guide
+      link: /guide/dev-environment/
+      icon: right-arrow
+    - text: GitHub
+      link: https://github.com/noders-team/damlforge
+      icon: external
+      variant: minimal
+---
+
+DamlForge lets you write Canton smart contracts in `.vy` files. These use Python
+syntax with a few contract-specific (Vyper-flavored) keywords. The `forge` compiler turns each
+`.vy` file into ordinary Daml source, and DPM, the Daml package manager, builds,
+tests, and ships that source. Nothing in a `.vy` file runs as Python: the file is
+parsed, checked, and lowered straight to Daml.
+
+## How it works
+
+**1. Install DamlForge** (Python 3.11 or newer):
+
+```bash
+pip install damlforge
+```
+
+**2. Write a contract** in `Main.vy`:
+
+```python
+from forge.builtins.daml_lang import create
+from forge.models import ContractId, Party, choice, template
+
+
+@template
+class Asset:
+    issuer: Party
+    owner: Party
+    name: str
+
+    signatory: Party = issuer
+    observer: Party = owner
+    ensure: bool = name != ""
+
+    @choice(controller=owner, consuming=True)
+    def give(self, new_owner: Party) -> ContractId[Asset]:
+        return create(Asset(issuer=self.issuer, owner=new_owner, name=self.name))
+```
+
+**3. Compile it to Daml:**
+
+```bash
+forge daml Main.vy -o out/
+```
+
+`forge` generates `out/Main.daml`:
+
+```haskell
+module Main where
+
+template Asset
+  with
+    issuer : Party
+    owner : Party
+    name : Text
+  where
+    signatory issuer
+    observer owner
+    ensure name /= ""
+
+    choice Give : ContractId Asset
+      with
+        new_owner : Party
+      controller owner
+      do
+        let self = this
+        create (Asset with issuer = self.issuer, owner = new_owner, name = self.name)
+```
+
+**More:** see the [full documentation](/guide/dev-environment/), from setup to packaging.

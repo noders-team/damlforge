@@ -1,0 +1,7 @@
+/* Starlight's hero is made for the full-width splash layout. On the home page, which keeps
+   the sidebar, its large vertical padding leaves an empty band above the title. */
+@media (min-width: 50rem) {
+	.hero {
+		padding-block: 0 1rem;
+	}
+}

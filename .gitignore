@@ -71,6 +71,7 @@ commitmsg.txt
 *.daml
 */*/*.map.json
 */*/*.json
+!docs/webpage/*.json
 examples/*/.daml/
 examples/*/*.dar
 examples/legacy/**

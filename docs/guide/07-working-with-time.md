@@ -10,6 +10,9 @@ test that passes.
 
 ## Time types
 
+Use Python's standard `datetime` types directly in `.vy` contracts; do not
+import `Date`, `Timestamp`, or `RelTime` from `forge.models`.
+
 `.vy` uses Python's own `datetime` module. Each type maps to a Daml type:
 
 | `.vy` | Daml | Example |
