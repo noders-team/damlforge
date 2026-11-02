@@ -98,8 +98,10 @@ class ImportsBuilder:
                     node,
                     code=ErrorCodes.DF1213.value,
                 )
-            if isinstance(node, vy_ast.Import) and self.is_builtin_root(root) and not self.builtin_stub(
-                module_str
+            if (
+                isinstance(node, vy_ast.Import)
+                and self.is_builtin_root(root)
+                and not self.builtin_stub(module_str)
             ):
                 raise DamlForgeException(
                     f"No module named `{module_str}` - no builtin stub is available",

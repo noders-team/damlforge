@@ -19,12 +19,12 @@ import pytest
 
 from forge.ast.parse import parse_to_ast
 from forge.builtins import known_builtin_function_names
+from forge.codegen import generate_daml
 from forge.exceptions import ExceptionList
+from forge.ir import lower_module
+from forge.models.error_codes import ErrorCodes
 from forge.semantics import analyze_module
 from forge.semantics.analysis.imports import ImportsBuilder
-from forge.models.error_codes import ErrorCodes
-from forge.ir import lower_module
-from forge.codegen import generate_daml
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "structure"
 

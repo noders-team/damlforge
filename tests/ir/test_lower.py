@@ -19,8 +19,8 @@ import pytest
 
 from forge.ast.parse import parse_to_ast
 from forge.ir import lower_module
-from forge.ir.lower import LIST_SET_HELPER
 from forge.ir.imports import _walk_ir
+from forge.ir.lower import LIST_SET_HELPER
 from forge.ir.nodes import (
     Field,
     IRAssert,
@@ -874,11 +874,11 @@ def test_conditional_expression_lowering_fuzzer_case():
             IRImport("DA.TextMap", alias="TextMap", qualified=False),
         ),
         (
-            "def f() -> int:\n    return len([{'a': 1}])\n",
+            f"def f() -> int:\n    return len([{{'a': {1}}}])\n",
             IRImport("DA.TextMap", alias="TextMap", qualified=False),
         ),
         (
-            "def f(p: Party) -> int:\n    m: GenMap[Party, int] = {p: 1}\n    return 0\n",
+            f"def f(p: Party) -> int:\n    m: GenMap[Party, int] = {{p: {1}}}\n    return 0\n",
             IRImport("DA.Map", alias="Map", qualified=False),
         ),
     ],

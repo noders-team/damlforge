@@ -20,8 +20,8 @@ from pathlib import Path
 
 from forge.ast import nodes as vy_ast
 from forge.ast.utils import type_aliases, type_var_names
-from forge.builtin_stubs import BUILTINS_DIR
-from forge.builtins import DamlName, choice
+from forge.builtin_stubs import BUILTINS_DIR, scope_of, stub_scope
+from forge.builtins import DamlName, choice, collect_daml_builtins
 from forge.builtins.maps import known_map_types
 from forge.exceptions import CompilerPanic
 from forge.ir import fields
@@ -65,6 +65,7 @@ from forge.ir.nodes import (
     TypeRef,
 )
 from forge.models.decorators import Consuming
+from forge.semantics.analysis.imports import ImportsBuilder
 from forge.utils import daml_module_name
 
 
@@ -952,10 +953,6 @@ def _sibling_constructor_names(node) -> frozenset:
 
 
 def _lower_imports(body, import_graph=None) -> tuple:
-    from forge.builtins import collect_daml_builtins
-    from forge.semantics.analysis.imports import ImportsBuilder
-    from forge.utils import daml_module_name
-
     case_accessor_names = frozenset(collect_daml_builtins().case_accessors)
 
     def _daml_module_ref(module_str: str, node=None) -> str:
@@ -1005,8 +1002,6 @@ def _lower_imports(body, import_graph=None) -> tuple:
 
 
 def lower_module(module: vy_ast.Module, import_graph=None) -> IRModule:
-    from forge.builtin_stubs import scope_of, stub_scope
-
     scope = module._metadata.get("stub_scope") or scope_of(module)
     with stub_scope(scope), fields.field_scope(module):
         return replace(_lower_module(module, import_graph), stub_scope=scope)

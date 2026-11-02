@@ -79,7 +79,8 @@ def test_annotate_daml_output_adds_source_locations():
             "Range:    111:17-111:186",
             "Message:",
             "daml/Earnout/Earnout.daml:111:17: error:",
-            "    • Constructor ‘Dispute’ does not have the required strict field(s): verdict_quarter",
+            "    • Constructor ‘Dispute’ does not have the required strict field(s): "
+            "verdict_quarter",
             "    • In the first argument of ‘create’:",
         ]
     )

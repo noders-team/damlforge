@@ -27,6 +27,8 @@ Every element is checked against the same expected type or inference variable.
 from dataclasses import dataclass, field
 
 from forge.ast import nodes as vy_ast
+from forge.ast.utils import type_aliases
+from forge.builtins import collect_daml_builtins
 from forge.exceptions import CompilerPanic, DamlForgeException, ExceptionList
 from forge.ir.lower import lower_type
 from forge.ir.nodes import TypeRef
@@ -915,10 +917,6 @@ class BidirectionalTypeChecker:
 
 
 def _type_aliases(node) -> dict:
-    from forge.ast.utils import type_aliases
-    from forge.builtins import collect_daml_builtins
-    from forge.ir.lower import lower_type
-
     module = node if isinstance(node, vy_ast.Module) else node.module_node
     local = type_aliases(module) if module is not None else {}
     return {
