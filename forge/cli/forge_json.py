@@ -11,7 +11,6 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-# limitations under the License.
 
 from forge.ast.parse import parse_to_ast
 from forge.exceptions import tag_exceptions
@@ -19,8 +18,8 @@ from forge.semantics import analyze_module
 
 
 def compile_json(input_vy: str) -> dict:
+    """Parse and analyze .vy source, returning its AST as a JSON-compatible dict."""
     ast = parse_to_ast(input_vy)
     with tag_exceptions(ast):
         analyze_module(ast)
-
     return ast.to_dict()
