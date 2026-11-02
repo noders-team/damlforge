@@ -270,11 +270,12 @@ def test_known_builtin_function_names_cover_ledger_operations():
 def test_sibling_vy_import_still_resolves_via_load_import(tmp_path):
     sibling_path = tmp_path / "loan_terms.vy"
     sibling_path.write_text(
-        "from forge.models import template\n\n"
+        "from forge.models import Party, template\n\n"
         "@template\n"
         "class LoanTerms:\n"
+        "    owner: Party\n\n"
         "    rate: int\n\n"
-        "    signatory: list[Party] = []\n"
+        "    signatory: list[Party] = [owner]\n"
     )
 
     main_path = tmp_path / "main.vy"

@@ -228,7 +228,7 @@ def _render_infix_operand(e) -> str:
 
 
 def _render_unary_operand(e) -> str:
-    if isinstance(e, (IRAttribute, IRSubscript)):
+    if isinstance(e, (IRAttribute, IRSubscript, IRCall)):
         return f"({render_expr(e)})"
     return _render_infix_operand(e)
 
@@ -302,7 +302,7 @@ def render_expr(e) -> str:
 
 
 def _render_atom_for_attr(value) -> str:
-    if isinstance(value, IRName):
+    if isinstance(value, IRName) and all(part.isidentifier() for part in value.id.split(".")):
         return value.id
     return f"({render_expr(value)})"
 
@@ -1377,8 +1377,7 @@ def generate_daml(
     settings: DamlCodegenSettings = DamlCodegenSettings(),
 ):
     with stub_scope(module.stub_scope):
-        known_effect_fns = (
-            collect_daml_builtins().ledger_effect_fns
-            | frozenset(module.effect_functions)
+        known_effect_fns = collect_daml_builtins().ledger_effect_fns | frozenset(
+            module.effect_functions
         )
         return Emitter(known_effect_fns, settings).generate(module, module_name)
