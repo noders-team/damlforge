@@ -430,24 +430,31 @@ def _lower_stmt_AnnAssign(node):
     return IRAssign(target, value, target_type, src=_src(node))
 
 
+def _setter_name(node: vy_ast.Subscript, target: IRSubscript) -> str | None:
+    """Return the helper that rewrites `x[i] = v` into a pure update of `x`, if one applies.
+
+    Lists use the list-set helper; known map types use their module's `insert`.
+    """
+    if target.is_list:
+        return LIST_SET_HELPER
+    recv_type = _effective_type(node.value)
+    if recv_type is None:
+        return None
+    map_type = known_map_types().get(recv_type.name)
+    if map_type is None:
+        return None
+    return f"{map_type.module}.insert"
+
+
 def _lower_stmt_Assign(node):
+    """Lower an assignment, rewriting `x[i] = v` into `x = setter(i, v, x)` when it has a setter."""
     target = lower_expr(node.target)
     value = lower_expr(node.value)
-    if isinstance(target, IRSubscript) and target.is_list:
-        subscript = target
-        receiver = subscript.value
-        target = receiver
-        value = IRCall(IRName(LIST_SET_HELPER), (subscript.index, value, receiver))
-    elif isinstance(target, IRSubscript):
-        recv_type = _effective_type(node.target.value)
-        map_type = None
-        if recv_type is not None:
-            map_type = known_map_types().get(recv_type.name)
-        if map_type is not None:
-            subscript = target
-            receiver = subscript.value
-            target = receiver
-            value = IRCall(IRName(f"{map_type.module}.insert"), (subscript.index, value, receiver))
+    if isinstance(target, IRSubscript) and isinstance(node.target, vy_ast.Subscript):
+        setter = _setter_name(node.target, target)
+        if setter is not None:
+            value = IRCall(IRName(setter), (target.index, value, target.value))
+            target = target.value
     return IRAssign(target, value, src=_src(node))
 
 
