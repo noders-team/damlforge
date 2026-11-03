@@ -39,8 +39,8 @@ def _compile_to_daml(source):
 @pytest.mark.parametrize(
     "call, expected",
     [
-        ("g({'a': 1})", 'g (TextMap.fromList [("a", 1)])'),
-        ("g({'a': 1, 'b': 2})", 'g (TextMap.fromList [("a", 1), ("b", 2)])'),
+        (f"g({{'a': {1}}})", 'g (TextMap.fromList [("a", 1)])'),
+        (f"g({{'a': {1}, 'b': {2}}})", 'g (TextMap.fromList [("a", 1), ("b", 2)])'),
         ("g({})", "g (TextMap.fromList [])"),
     ],
 )

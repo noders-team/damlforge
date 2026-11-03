@@ -275,7 +275,7 @@ class ModuleAnalyzer:
                 if imported_module is None:
                     continue
                 ModuleAnalyzer(imported_module, self.errors, self.analyzed).analyze()
-                
+
     def _check_enum_constructor_collisions(self) -> None:
         """Daml constructors share one module-level namespace.
 
@@ -284,11 +284,23 @@ class ModuleAnalyzer:
         Report it at the source declaration instead.
         """
         seen: dict[str, str] = {}
+        template_names = {
+            node.name for node in self.module.body if isinstance(node, vy_ast.TemplateDef)
+        }
         for enum in (node for node in self.module.body if isinstance(node, vy_ast.EnumDef)):
             for stmt in enum.body:
                 name = vy_ast.enum_member_name(stmt)
                 if name is None:
                     continue
+                if name in template_names:
+                    self.errors.append(
+                        DamlForgeException(
+                            f"Enum member `{name}` conflicts with template `{name}`; Daml "
+                            "constructors must be unique within a module",
+                            stmt,
+                            code=ErrorCodes.DF1231.value,
+                        )
+                    )
                 previous = seen.get(name)
                 if previous is not None and previous != enum.name:
                     self.errors.append(

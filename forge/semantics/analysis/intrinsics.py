@@ -264,9 +264,7 @@ class DatetimeIntrinsicAnalyzer:
             )
             return False
         call._metadata.update(
-            daml_builtin="getTime",
-            return_type="Timestamp",
-            is_ledger_effect=True,
+            daml_builtin="getTime", return_type="Timestamp", is_ledger_effect=True
         )
         return True
 

@@ -17,7 +17,6 @@ from forge.ast import nodes as vy_ast
 from forge.builtin_stubs import scope_of, stub_scope
 from forge.exceptions import ExceptionList
 from forge.semantics.analysis.imports import ImportGraph, ImportsBuilder
-from forge.semantics.analysis.module import ModuleAnalyzer, RecursionAnalyzer
 
 
 def analyze_module(module: vy_ast.Module) -> ImportGraph:
@@ -28,6 +27,8 @@ def analyze_module(module: vy_ast.Module) -> ImportGraph:
 
 
 def _analyze_module(module: vy_ast.Module) -> ImportGraph:
+    from forge.semantics.analysis.module import ModuleAnalyzer, RecursionAnalyzer
+
     errors = ExceptionList()
     imports_builder = ImportsBuilder()
     imports_builder.resolve_imports(module, errors)

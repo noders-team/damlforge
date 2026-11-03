@@ -27,6 +27,8 @@ Every element is checked against the same expected type or inference variable.
 from dataclasses import dataclass, field
 
 from forge.ast import nodes as vy_ast
+from forge.ast.utils import type_aliases
+from forge.builtins import collect_daml_builtins
 from forge.exceptions import CompilerPanic, DamlForgeException, ExceptionList
 from forge.ir.lower import lower_type
 from forge.ir.nodes import TypeRef
@@ -345,11 +347,14 @@ class BidirectionalTypeChecker:
         return None
 
     def _attribute_type(self, expr, env: TypeEnvironment) -> TypeTerm | None:
-        if expr._metadata.get("is_enum_value") and isinstance(expr.value, vy_ast.Name):
-            return AppliedType(expr.value.id)
-        if (
-            isinstance(expr.value, vy_ast.Name)
-            and (primitive_spec(expr.value.id) is not None or generic_spec(expr.value.id) is not None)
+        if expr._metadata.get("is_enum_value"):
+            enum_name = expr._metadata.get("enum_name")
+            if enum_name is not None:
+                return AppliedType(enum_name)
+            if isinstance(expr.value, vy_ast.Name):
+                return AppliedType(expr.value.id)
+        if isinstance(expr.value, vy_ast.Name) and (
+            primitive_spec(expr.value.id) is not None or generic_spec(expr.value.id) is not None
         ):
             self._error(
                 expr,
@@ -485,9 +490,10 @@ class BidirectionalTypeChecker:
                 if qualified in self.field_types:
                     self._check_call_arguments(call, env, qualified)
                     return None
-                if primitive_spec(call.func.value.id) is not None or generic_spec(
-                    call.func.value.id
-                ) is not None:
+                if (
+                    primitive_spec(call.func.value.id) is not None
+                    or generic_spec(call.func.value.id) is not None
+                ):
                     self._error(
                         call,
                         f"`{call.func.value.id}` is a type name, not a value; qualified "
@@ -911,10 +917,6 @@ class BidirectionalTypeChecker:
 
 
 def _type_aliases(node) -> dict:
-    from forge.ast.utils import type_aliases
-    from forge.builtins import collect_daml_builtins
-    from forge.ir.lower import lower_type
-
     module = node if isinstance(node, vy_ast.Module) else node.module_node
     local = type_aliases(module) if module is not None else {}
     return {

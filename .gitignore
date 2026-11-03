@@ -77,3 +77,4 @@ examples/*/*.dar
 examples/legacy/**
 examples/earnout
 tests/stubgen/fixtures/keys
+.claude/*

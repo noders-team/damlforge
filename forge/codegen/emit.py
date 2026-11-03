@@ -20,15 +20,16 @@ from typing import Optional
 from forge.builtin_stubs import stub_scope
 from forge.builtins import collect_daml_builtins
 from forge.builtins.daml_lang import TEMPLATE_ARGUMENT_FUNCTIONS
-from forge.daml_versions import DamlCodegenSettings
 from forge.codegen.doc import concat, line, nest, render, text
 from forge.codegen.maps import is_map_type, render_map_literal, render_map_type
 from forge.codegen.optional import is_optional_type, render_optional_type
+from forge.codegen.self_mutation import SELF, SelfFieldRewriter, SelfMutationInjector
 from forge.codegen.sets import is_set_type, render_set_type
+from forge.daml_versions import DamlCodegenSettings
 from forge.exceptions import CompilerPanic, DamlForgeException
-from forge.utils import daml_choice_name
 from forge.ir.lower import FLOOR_DIV_DECIMAL_HELPER, FLOOR_DIV_HELPER, LIST_SET_HELPER
 from forge.ir.nodes import (
+    Field,
     IRAssert,
     IRAssertLoop,
     IRAssign,
@@ -39,17 +40,16 @@ from forge.ir.nodes import (
     IRChoice,
     IRCompare,
     IRConstant,
-    Field,
     IRDict,
+    IREarlyReturnLoop,
+    IREnum,
     IRExprStmt,
     IRFold,
-    IREnum,
     IRFor,
     IRFunction,
     IRIf,
     IRIfExp,
     IRImport,
-    IREarlyReturnLoop,
     IRInterface,
     IRInterfaceInstance,
     IRList,
@@ -68,10 +68,12 @@ from forge.ir.nodes import (
     SourceSpan,
     TypeRef,
 )
+from forge.ir.normalize import LoopAnalysis, LoopAnalyzer, LoopNamer
 from forge.models.decorators import Consuming
 from forge.models.error_codes import ErrorCodes
-from forge.ir.normalize import LoopAnalysis, LoopAnalyzer, LoopNamer
-from forge.codegen.self_mutation import SELF, SelfFieldRewriter, SelfMutationInjector
+from forge.utils import daml_choice_name
+
+DEFAULTS = DamlCodegenSettings()
 
 _PRIMITIVE_TYPE_MAP = {
     "int": "Int",
@@ -228,7 +230,7 @@ def _render_infix_operand(e) -> str:
 
 
 def _render_unary_operand(e) -> str:
-    if isinstance(e, (IRAttribute, IRSubscript)):
+    if isinstance(e, (IRAttribute, IRSubscript, IRCall)):
         return f"({render_expr(e)})"
     return _render_infix_operand(e)
 
@@ -302,7 +304,7 @@ def render_expr(e) -> str:
 
 
 def _render_atom_for_attr(value) -> str:
-    if isinstance(value, IRName):
+    if isinstance(value, IRName) and all(part.isidentifier() for part in value.id.split(".")):
         return value.id
     return f"({render_expr(value)})"
 
@@ -368,7 +370,10 @@ def _render_call(e: IRCall) -> str:
         stop_text = _render_call_arg(stop)
         positive = f"[{start_text}, {start_text} + {step_text} .. ({stop_text}) - 1]"
         negative = f"[{start_text}, {start_text} + {step_text} .. ({stop_text}) + 1]"
-        return f'if {step_text} > 0 then {positive} else if {step_text} < 0 then {negative} else error "range() arg 3 must not be zero"'
+        return (
+            f"if {step_text} > 0 then {positive} else if {step_text} < 0 then {negative} "
+            f'else error "range() arg 3 must not be zero"'
+        )
 
     if isinstance(e.func, IRName) and not e.keywords and len(e.args) == 1:
         constructor = _case_accessors().get(e.func.id)
@@ -935,9 +940,7 @@ def render_stmt(stmt, indent: int, in_update_block: bool = True) -> list:
 
 class Emitter:
     def __init__(
-        self,
-        known_effect_fns: frozenset = frozenset(),
-        settings: DamlCodegenSettings = DamlCodegenSettings(),
+        self, known_effect_fns: frozenset = frozenset(), settings: DamlCodegenSettings = DEFAULTS
     ):
         self.lines: list = []
         self.mappings: list = []
@@ -1372,13 +1375,10 @@ class Emitter:
 
 
 def generate_daml(
-    module: IRModule,
-    module_name: Optional[str] = None,
-    settings: DamlCodegenSettings = DamlCodegenSettings(),
+    module: IRModule, module_name: Optional[str] = None, settings: DamlCodegenSettings = DEFAULTS
 ):
     with stub_scope(module.stub_scope):
-        known_effect_fns = (
-            collect_daml_builtins().ledger_effect_fns
-            | frozenset(module.effect_functions)
+        known_effect_fns = collect_daml_builtins().ledger_effect_fns | frozenset(
+            module.effect_functions
         )
         return Emitter(known_effect_fns, settings).generate(module, module_name)

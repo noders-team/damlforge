@@ -14,14 +14,18 @@
 # limitations under the License.
 
 import dataclasses
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from pathlib import Path
 
 from forge.ast import nodes as vy_ast
 from forge.ast.utils import type_aliases, type_var_names
+from forge.builtin_stubs import BUILTINS_DIR, scope_of, stub_scope
+from forge.builtins import DamlName, choice, collect_daml_builtins
+from forge.builtins.maps import known_map_types
 from forge.exceptions import CompilerPanic
 from forge.ir import fields
+from forge.ir.imports import prepare_ir_module
 from forge.ir.nodes import (
     Field,
     IRAssert,
@@ -34,17 +38,17 @@ from forge.ir.nodes import (
     IRCompare,
     IRConstant,
     IRDict,
+    IREnum,
     IRExpr,
     IRExprStmt,
-    IREnum,
     IRFor,
     IRFunction,
     IRIf,
     IRIfExp,
+    IRImport,
     IRInterface,
     IRInterfaceInstance,
     IRList,
-    IRImport,
     IRModule,
     IRName,
     IRPass,
@@ -60,10 +64,9 @@ from forge.ir.nodes import (
     SourceSpan,
     TypeRef,
 )
-from forge.ir.imports import prepare_ir_module
-from forge.builtins import DamlName, choice
-from forge.builtins.maps import known_map_types
 from forge.models.decorators import Consuming
+from forge.semantics.analysis.imports import ImportsBuilder
+from forge.utils import daml_module_name
 
 
 def _src(node: vy_ast.VyperNode) -> SourceSpan:
@@ -111,7 +114,8 @@ def lower_type(node: vy_ast.VyperNode) -> TypeRef:
     if isinstance(node, vy_ast.NameConstant) and node.value is None:
         return TypeRef("None")
     if isinstance(node, vy_ast.Attribute) and isinstance(node.value, vy_ast.Name):
-        return TypeRef(f"{node.value.id}.{node.attr}")
+        qualifier = _daml_imported_module_name(node, node.value.id) or node.value.id
+        return TypeRef(f"{qualifier}.{node.attr}")
     if isinstance(node, vy_ast.Subscript):
         if isinstance(node.value, vy_ast.Name) and node.value.id == "Annotated":
             inner = node.slice.elements[0] if isinstance(node.slice, vy_ast.Tuple) else node.slice
@@ -139,6 +143,29 @@ def _inferred_type(node: vy_ast.VyperNode) -> TypeRef | None:
     return type_ref if isinstance(type_ref, TypeRef) else None
 
 
+def _effective_type(node: vy_ast.VyperNode) -> TypeRef | None:
+    inferred = _inferred_type(node)
+    if inferred is not None:
+        return inferred
+    if not isinstance(node, vy_ast.Name):
+        return None
+    function = node.get_ancestor(vy_ast.FunctionDef)
+    if not isinstance(function, vy_ast.FunctionDef):
+        return None
+    argument = None
+    arguments = function.args.args
+    for item in arguments:
+        if item.arg == node.id:
+            argument = item
+            break
+    if argument is not None and argument.annotation is not None:
+        return lower_type(argument.annotation)
+    for statement in function.get_descendants(vy_ast.AnnAssign):
+        if isinstance(statement.target, vy_ast.Name) and statement.target.id == node.id:
+            return lower_type(statement.annotation)
+    return None
+
+
 def _lower_expr_inner(node: vy_ast.VyperNode):
     handler = globals().get(f"_lower_expr_{type(node).__name__}")
     if handler is None:
@@ -151,7 +178,40 @@ def _lower_expr_Ellipsis(node):
 
 
 def _lower_expr_Name(node):
-    return IRName(node.id, _inferred_type(node))
+    return IRName(_daml_imported_module_name(node, node.id) or node.id, _inferred_type(node))
+
+
+def _daml_imported_module_name(node: vy_ast.VyperNode, py_name: str) -> str | None:
+    module = getattr(node, "module_node", None)
+    if module is None:
+        return None
+
+    for stmt in module.body:
+        if not isinstance(stmt, vy_ast.Import):
+            continue
+        aliases = stmt.names
+        for alias in aliases:
+            if (alias.asname or alias.name) != py_name:
+                continue
+            if alias.asname is not None:
+                return alias.asname
+            info = None
+            infos = stmt._metadata.get("import_infos", ())
+            for item in infos:
+                if item.alias == alias.name:
+                    info = item
+                    break
+            resolved = getattr(info, "resolved_path", None)
+            if info is None or (
+                resolved is not None and BUILTINS_DIR in Path(resolved).resolve().parents
+            ):
+                return None
+            path_str = getattr(getattr(info, "ast", None), "path", None)
+            if path_str:
+                path = Path(path_str).with_suffix("")
+                return ".".join(daml_module_name(part) for part in path.parts)
+            return daml_module_name(alias.name)
+    return None
 
 
 def _receiver_type(node) -> "str | None":
@@ -165,6 +225,9 @@ def _receiver_type(node) -> "str | None":
 
 def _lower_expr_Attribute(node):
     if node._metadata.get("is_enum_value"):
+        qualifier = node._metadata.get("enum_qualifier")
+        if qualifier:
+            return IRAttribute(IRName(qualifier), node.attr)
         return IRName(node.attr)
     attr = fields.current().attribute(_receiver_type(node), node.attr)
     return IRAttribute(lower_expr(node.value), attr)
@@ -325,6 +388,15 @@ def _lower_expr_UnaryOp(node):
 
 
 def _lower_expr_Compare(node):
+    right_type = _effective_type(node.right)
+    map_type = None
+    if right_type is not None:
+        map_type = known_map_types().get(right_type.name)
+    if map_type is not None and isinstance(node.op, (vy_ast.In, vy_ast.NotIn)):
+        membership = IRCall(
+            IRName(f"{map_type.module}.member"), (lower_expr(node.left), lower_expr(node.right))
+        )
+        return membership if isinstance(node.op, vy_ast.In) else IRUnaryOp("not", membership)
     op = _COMPARE_OPS[type(node.op).__name__]
     return IRCompare(lower_expr(node.left), op, lower_expr(node.right))
 
@@ -358,14 +430,31 @@ def _lower_stmt_AnnAssign(node):
     return IRAssign(target, value, target_type, src=_src(node))
 
 
+def _setter_name(node: vy_ast.Subscript, target: IRSubscript) -> str | None:
+    """Return the helper that rewrites `x[i] = v` into a pure update of `x`, if one applies.
+
+    Lists use the list-set helper; known map types use their module's `insert`.
+    """
+    if target.is_list:
+        return LIST_SET_HELPER
+    recv_type = _effective_type(node.value)
+    if recv_type is None:
+        return None
+    map_type = known_map_types().get(recv_type.name)
+    if map_type is None:
+        return None
+    return f"{map_type.module}.insert"
+
+
 def _lower_stmt_Assign(node):
+    """Lower an assignment, rewriting `x[i] = v` into `x = setter(i, v, x)` when it has a setter."""
     target = lower_expr(node.target)
     value = lower_expr(node.value)
-    if isinstance(target, IRSubscript) and target.is_list:
-        subscript = target
-        receiver = subscript.value
-        target = receiver
-        value = IRCall(IRName(LIST_SET_HELPER), (subscript.index, value, receiver))
+    if isinstance(target, IRSubscript) and isinstance(node.target, vy_ast.Subscript):
+        setter = _setter_name(node.target, target)
+        if setter is not None:
+            value = IRCall(IRName(setter), (target.index, value, target.value))
+            target = target.value
     return IRAssign(target, value, src=_src(node))
 
 
@@ -429,14 +518,75 @@ def _lower_body(body) -> tuple:
     return tuple(lower_stmt(s) for s in body if not isinstance(s, vy_ast.DocStr))
 
 
-def _lower_args(fn: vy_ast.FunctionDef) -> tuple:
-    fields = []
+def _lower_args(fn: vy_ast.FunctionDef, names: "LocalNames | None" = None) -> tuple[Field, ...]:
+    fields: list[Field] = []
     for a in fn.args.args:
         if a.arg == "self":
             continue
         arg_type = lower_type(a.annotation) if a.annotation is not None else None
-        fields.append(Field(a.arg, arg_type))
+        arg_name = names.rename(a.arg) if names is not None else a.arg
+        fields.append(Field(arg_name, arg_type))
     return tuple(fields)
+
+
+@dataclass(frozen=True)
+class LocalName:
+    source: str
+    target: str
+
+
+@dataclass(frozen=True)
+class LocalNames:
+    entries: tuple[LocalName, ...]
+
+    def rename(self, name: str) -> str:
+        for entry in self.entries:
+            if entry.source == name:
+                return entry.target
+        return name
+
+
+def _bound_names(target: vy_ast.VyperNode) -> set[str]:
+    if isinstance(target, vy_ast.Name):
+        return {target.id}
+    if isinstance(target, (vy_ast.Tuple, vy_ast.List)):
+        names = set()
+        for element in target.elements:
+            names.update(_bound_names(element))
+        return names
+    return set()
+
+
+def _local_daml_renames(fn: vy_ast.FunctionDef) -> LocalNames:
+    bound = {arg.arg for arg in fn.args.args if arg.arg != "self"}
+    node_types = (vy_ast.Assign, vy_ast.AnnAssign, vy_ast.AugAssign, vy_ast.For)
+    for node_type in node_types:
+        statements = fn.get_descendants(node_type)
+        for statement in statements:
+            bound.update(_bound_names(statement.target))
+
+    renames: list[LocalName] = []
+    used = set(bound)
+    for name in sorted(bound):
+        if not name[:1].isupper():
+            continue
+        base = f"_damlforge_{name.lower()}"
+        candidate = base
+        suffix = 2
+        while candidate in used:
+            candidate = f"{base}_{suffix}"
+            suffix += 1
+        renames.append(LocalName(name, candidate))
+        used.add(candidate)
+    return LocalNames(tuple(renames))
+
+
+def _rename_local_nodes(fn: vy_ast.FunctionDef, names: LocalNames) -> None:
+    statements = fn.body
+    for statement in statements:
+        name_nodes = statement.get_descendants(vy_ast.Name)
+        for name_node in name_nodes:
+            name_node.id = names.rename(name_node.id)
 
 
 def _decorator_names(fn: vy_ast.FunctionDef) -> tuple:
@@ -477,10 +627,12 @@ def _lower_consuming(node) -> Consuming:
 
 
 def lower_function(fn: vy_ast.FunctionDef) -> IRFunction:
+    local_names = _local_daml_renames(fn)
+    _rename_local_nodes(fn, local_names)
     return_type = lower_type(fn.returns) if fn.returns is not None else None
     return IRFunction(
         name=_daml_name_override(fn) or fn.name,
-        args=_lower_args(fn),
+        args=_lower_args(fn, local_names),
         return_type=return_type,
         decorators=_decorator_names(fn),
         body=_lower_body(fn.body),
@@ -490,6 +642,8 @@ def lower_function(fn: vy_ast.FunctionDef) -> IRFunction:
 
 
 def lower_choice(fn: vy_ast.FunctionDef) -> IRChoice:
+    local_names = _local_daml_renames(fn)
+    _rename_local_nodes(fn, local_names)
     call = _choice_call(fn)
     controller = None
     consuming = None
@@ -509,7 +663,7 @@ def lower_choice(fn: vy_ast.FunctionDef) -> IRChoice:
         controller=controller,
         consuming=consuming,
         observer=observer,
-        args=_lower_args(fn),
+        args=_lower_args(fn, local_names),
         return_type=return_type,
         body=_lower_body(fn.body),
         src=_src(fn),
@@ -806,10 +960,6 @@ def _sibling_constructor_names(node) -> frozenset:
 
 
 def _lower_imports(body, import_graph=None) -> tuple:
-    from forge.builtins import collect_daml_builtins
-    from forge.semantics.analysis.imports import ImportsBuilder
-    from forge.utils import daml_module_name
-
     case_accessor_names = frozenset(collect_daml_builtins().case_accessors)
 
     def _daml_module_ref(module_str: str, node=None) -> str:
@@ -859,8 +1009,6 @@ def _lower_imports(body, import_graph=None) -> tuple:
 
 
 def lower_module(module: vy_ast.Module, import_graph=None) -> IRModule:
-    from forge.builtin_stubs import scope_of, stub_scope
-
     scope = module._metadata.get("stub_scope") or scope_of(module)
     with stub_scope(scope), fields.field_scope(module):
         return replace(_lower_module(module, import_graph), stub_scope=scope)

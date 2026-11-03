@@ -192,6 +192,27 @@ def f(xs: list[int]) -> int:
     assert "import DA.Optional (fromSome)" in daml
 
 
+def test_loop_scoped_record_access_unwraps_before_attribute_selection() -> None:
+    daml = _compile(
+        "from forge.builtins.daml_lang import fetch\n"
+        "from forge.models import ContractId, Decimal, Party, choice, template\n\n"
+        "struct Lot:\n"
+        "    amount: Decimal\n\n"
+        "@template\n"
+        "class Note:\n"
+        "    owner: Party\n"
+        "    lot: Lot\n"
+        "    signatory: list[Party] = [owner]\n\n"
+        "    @choice(controller=owner, consuming=False)\n"
+        "    def Size(self, cid: ContractId[Note]) -> Decimal:\n"
+        "        for _k in range(0, 2):\n"
+        "            note = fetch(cid)\n"
+        "        return note.lot.amount\n"
+    )
+    assert "(fromSome _damlforge_" in daml
+    assert ").lot).amount" in daml
+
+
 def test_reported_expression_lowerings_are_buildable_shapes():
     daml = _compile("""
 from forge.models import Decimal, TextMap

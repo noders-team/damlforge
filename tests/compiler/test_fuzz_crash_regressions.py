@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from pathlib import Path
+
 import pytest
 
 from forge.ast.parse import parse_to_ast
@@ -22,11 +24,33 @@ from forge.ir import lower_module
 from forge.semantics import analyze_module
 
 
-def _compile(source: str):
+def _compile(source: str) -> tuple[str, dict[str, object]]:
     module = parse_to_ast(source, module_path="fuzz.vy", resolved_path="fuzz.vy")
     analyze_module(module)
     ir = lower_module(module)
     return generate_daml(ir, "Fuzz")
+
+
+def _compile_imported(tmp_path: Path, source: str, filename: str = "main.vy") -> str:
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "models.vy").write_text(
+        "from enum import Enum, auto\n"
+        "from forge.models import Decimal, Party, template\n\n"
+        "class Kind(Enum):\n"
+        "    CASH = auto()\n\n"
+        "@template\n"
+        "class Note:\n"
+        "    owner: Party\n"
+        "    signatory: list[Party] = [owner]\n\n"
+        "def double(x: Decimal) -> Decimal:\n"
+        "    return x + x\n"
+    )
+    path = tmp_path / filename
+    path.write_text(source)
+    module = parse_to_ast(source, module_path=filename, resolved_path=str(path))
+    import_graph = analyze_module(module)
+    ir = lower_module(module, import_graph=import_graph)
+    return generate_daml(ir, "Main")[0]
 
 
 def test_malformed_type_subscript_is_rejected_instead_of_crashing():
@@ -270,22 +294,97 @@ def test_unsupported_unary_operator_is_rejected_before_lowering():
         )
 
 
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (
+            "from forge.models import GenMap, Party\n"
+            "\n"
+            "def mark(votes: GenMap[Party, bool], voter: Party) -> GenMap[Party, bool]:\n"
+            "    votes[voter] = True\n"
+            "    return votes\n",
+            "Map.insert voter True votes",
+        ),
+        (
+            "from forge.models import GenMap, Party\n"
+            "\n"
+            "def has_voted(votes: GenMap[Party, bool], voter: Party) -> bool:\n"
+            "    return voter in votes\n",
+            "Map.member voter votes",
+        ),
+        (
+            "from forge.models import GenMap, Party\n"
+            "\n"
+            "def is_new(votes: GenMap[Party, bool], voter: Party) -> bool:\n"
+            "    return voter not in votes\n",
+            "not (Map.member voter votes)",
+        ),
+        (
+            "def add_fee(a: int) -> int:\n" "    FEE = 10\n" "    return a + FEE\n",
+            "a + _damlforge_fee",
+        ),
+    ],
+    ids=("map-assignment", "map-membership", "map-nonmembership", "uppercase-local"),
+)
+def test_reported_lowerings_are_valid_daml(source: str, expected: str) -> None:
+    daml = _compile(source)[0]
+    assert expected in daml
+
+
+def test_enum_member_cannot_collide_with_template_name() -> None:
+    with pytest.raises(DamlForgeException, match="conflicts with template `CASH`"):
+        _compile(
+            "from enum import Enum, auto\n"
+            "from forge.models import Party, template\n\n"
+            "class Kind(Enum):\n"
+            "    CASH = auto()\n\n"
+            "@template\n"
+            "class CASH:\n"
+            "    owner: Party\n"
+            "    signatory: list[Party] = [owner]\n"
+        )
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        (
+            "import models as M\n\n" "def cash() -> M.Kind:\n" "    return M.Kind.CASH\n",
+            ("import qualified Models as M", "M.CASH"),
+        ),
+        (
+            "from forge.models import ContractId\n"
+            "import models\n\n"
+            "def same(c: ContractId[models.Note]) -> ContractId[models.Note]:\n"
+            "    return c\n",
+            ("import Models", "ContractId Models.Note"),
+        ),
+        (
+            "from forge.models import Decimal\n"
+            "import models\n\n"
+            "def twice(x: Decimal) -> Decimal:\n"
+            "    return models.double(x)\n",
+            ("import Models", "Models.double x"),
+        ),
+    ],
+    ids=("qualified-enum", "plain-type", "plain-call"),
+)
+def test_module_imports_use_daml_qualifiers(
+    tmp_path: Path, source: str, expected: tuple[str, ...]
+) -> None:
+    daml = _compile_imported(tmp_path, source)
+    for fragment in expected:
+        assert fragment in daml
+
+
 def test_uppercase_member_on_expression_is_rejected_before_daml_generation():
     with pytest.raises(DamlForgeException, match="Uppercase member `CASH`"):
-        _compile(
-            "from forge.models import Party\n"
-            "def f() -> str:\n"
-            "    return \"\".CASH\n"
-        )
+        _compile("from forge.models import Party\n" "def f() -> str:\n" '    return "".CASH\n')
 
 
 def test_qualified_access_on_primitive_type_is_rejected_before_daml_generation():
     with pytest.raises(DamlForgeException, match="`Party` is a type name, not a value"):
-        _compile(
-            "from forge.models import Party\n"
-            "def f() -> str:\n"
-            "    return Party.amount\n"
-        )
+        _compile("from forge.models import Party\n" "def f() -> str:\n" "    return Party.amount\n")
 
 
 def test_qualified_method_call_on_contract_id_type_is_rejected_before_daml_generation():
@@ -299,10 +398,7 @@ def test_qualified_method_call_on_contract_id_type_is_rejected_before_daml_gener
 
 def test_uppercase_method_on_expression_is_rejected_before_daml_generation():
     with pytest.raises(DamlForgeException, match="Uppercase member `Note`"):
-        _compile(
-            "def f() -> int:\n"
-            "    return [].Note()\n"
-        )
+        _compile("def f() -> int:\n" "    return [].Note()\n")
 
 
 def test_ledger_effect_in_template_field_value_is_rejected():
@@ -353,29 +449,17 @@ def test_enum_member_list_literal_uses_list_indexing():
 
 def test_bare_undefined_name_is_rejected_before_daml_generation():
     with pytest.raises(DamlForgeException, match="`missing` is not defined"):
-        _compile(
-            "def f() -> int:\n"
-            "    return missing\n"
-        )
+        _compile("def f() -> int:\n" "    return missing\n")
 
 
 def test_duplicate_top_level_functions_are_rejected_before_daml_generation():
     with pytest.raises(DamlForgeException, match="Function `f` is defined more than once"):
-        _compile(
-            "def f() -> int:\n"
-            "    return 1\n"
-            "def f() -> int:\n"
-            "    return 2\n"
-        )
+        _compile("def f() -> int:\n" "    return 1\n" "def f() -> int:\n" "    return 2\n")
 
 
 def test_duplicate_struct_fields_are_rejected_before_daml_generation():
     with pytest.raises(DamlForgeException, match="declares field `kind` more than once"):
-        _compile(
-            "struct Lot:\n"
-            "    kind: str\n"
-            "    kind: str\n"
-        )
+        _compile("struct Lot:\n" "    kind: str\n" "    kind: str\n")
 
 
 def test_comprehension_like_for_syntax_is_reported_as_syntax_error():

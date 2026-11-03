@@ -203,11 +203,7 @@ class HexStringParser:
 
 
 # compound statements that are replaced with `class`
-VYPER_CLASS_TYPES = {
-    "error": "ErrorDef",
-    "interface": "InterfaceDef",
-    "struct": "StructDef",
-}
+VYPER_CLASS_TYPES = {"error": "ErrorDef", "interface": "InterfaceDef", "struct": "StructDef"}
 
 # simple statements that are replaced with `yield`
 CUSTOM_STATEMENT_TYPES = {"log": "Log"}
@@ -286,7 +282,9 @@ class PreParser:
             and tokens[6].string == ":"
         )
 
-    def _get_bare_decorated_class_type(self, token_list: list[TokenInfo], class_index: int) -> str | None:
+    def _get_bare_decorated_class_type(
+        self, token_list: list[TokenInfo], class_index: int
+    ) -> str | None:
         if class_index < 3:
             return None
         newline_tok, name_tok, at_tok = (
@@ -347,7 +345,7 @@ class PreParser:
                     _parse_pragma(contents, settings, self._is_interface, code, start)
 
             if typ == NAME and string == "class":
-                # validating if its bare template or variant and replacing with the correct class 
+                # validating if its bare template or variant and replacing with the correct class
                 # type, i.e. TemplateDef or VariantDef
                 decorated_class_type = self._get_bare_decorated_class_type(token_list, i)
                 if decorated_class_type is not None:

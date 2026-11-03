@@ -19,12 +19,12 @@ import pytest
 
 from forge.ast.parse import parse_to_ast
 from forge.builtins import known_builtin_function_names
+from forge.codegen import generate_daml
 from forge.exceptions import ExceptionList
+from forge.ir import lower_module
+from forge.models.error_codes import ErrorCodes
 from forge.semantics import analyze_module
 from forge.semantics.analysis.imports import ImportsBuilder
-from forge.models.error_codes import ErrorCodes
-from forge.ir import lower_module
-from forge.codegen import generate_daml
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "structure"
 
@@ -270,11 +270,12 @@ def test_known_builtin_function_names_cover_ledger_operations():
 def test_sibling_vy_import_still_resolves_via_load_import(tmp_path):
     sibling_path = tmp_path / "loan_terms.vy"
     sibling_path.write_text(
-        "from forge.models import template\n\n"
+        "from forge.models import Party, template\n\n"
         "@template\n"
         "class LoanTerms:\n"
+        "    owner: Party\n\n"
         "    rate: int\n\n"
-        "    signatory: list[Party] = []\n"
+        "    signatory: list[Party] = [owner]\n"
     )
 
     main_path = tmp_path / "main.vy"

@@ -13,7 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
 from functools import cached_property
+from pathlib import Path
 
 from forge.ast import nodes as vy_ast
 from forge.ast.utils import module_assigns
@@ -24,6 +26,7 @@ from forge.models.error_codes import ErrorCodes
 from forge.semantics.analysis.imports import ImportsBuilder
 from forge.semantics.analysis.structure import _reachable_modules
 from forge.semantics.primitive_specs import generic_spec, type_is_ordered
+from forge.utils import daml_module_name
 
 
 def _safe_lower_type(node) -> TypeRef:
@@ -275,13 +278,21 @@ def _qualified_import_type_names(modules) -> set:
                 continue
             infos = stmt._metadata.get("import_infos", ())
             for alias in stmt.names:
-                if alias.asname is None:
-                    continue
                 stub = next((i.ast for i in infos if i.alias == alias.name), None)
                 if stub is not None:
+                    bound_name = alias.asname or alias.name
+                    daml_name = bound_name
+                    if alias.asname is None:
+                        path_str = getattr(stub, "path", None)
+                        if path_str:
+                            path = Path(path_str).with_suffix("")
+                            daml_name = ".".join(daml_module_name(part) for part in path.parts)
                     types = {n.name for n in stub.body if isinstance(n, _DECLARATION_TYPES)}
                     types |= _choice_exports(stub).keys() | module_assigns(stub).keys()
-                    names.update(f"{alias.asname}.{name}" for name in types)
+                    names.update(f"{bound_name}.{name}" for name in types)
+                    names.update(f"{daml_name}.{name}" for name in types)
+                    continue
+                if alias.asname is None:
                     continue
                 mod = ImportsBuilder._import_real_module(alias.name)
                 if mod is None:
@@ -292,6 +303,57 @@ def _qualified_import_type_names(modules) -> set:
                     if isinstance(obj, type):
                         names.add(f"{alias.asname}.{attr_name}")
     return names
+
+
+def _attribute_parts(node: vy_ast.VyperNode) -> list[str] | None:
+    parts = []
+    current = node
+    while isinstance(current, vy_ast.Attribute):
+        parts.append(current.attr)
+        current = current.value
+    if not isinstance(current, vy_ast.Name):
+        return None
+    parts.append(current.id)
+    return list(reversed(parts))
+
+
+@dataclass(frozen=True)
+class ImportedEnumValue:
+    enum: vy_ast.EnumDef
+    qualifier: str | None
+
+
+def _imported_enum_value(attr: vy_ast.Attribute) -> ImportedEnumValue | None:
+    parts = _attribute_parts(attr)
+    if parts is None or len(parts) != 3:
+        return None
+    module = attr.module_node
+    mod_name, enum_name, member_name = parts
+    for stmt in module.body:
+        if not isinstance(stmt, vy_ast.Import):
+            continue
+        aliases = stmt.names
+        for alias in aliases:
+            if (alias.asname or alias.name) != mod_name:
+                continue
+            info = None
+            infos = stmt._metadata.get("import_infos", ())
+            for item in infos:
+                if item.alias == alias.name:
+                    info = item
+                    break
+            if info is None:
+                continue
+            enum = None
+            declarations = info.ast.body
+            for declaration in declarations:
+                if isinstance(declaration, vy_ast.EnumDef) and declaration.name == enum_name:
+                    enum = declaration
+                    break
+            if enum is None or member_name not in _enum_members(enum):
+                return None
+            return ImportedEnumValue(enum, alias.asname)
+    return None
 
 
 def known_type_names(modules) -> set:
@@ -315,6 +377,13 @@ def check_enum_value_access(
     node: vy_ast.TopLevel, declarations: dict, errors: ExceptionList
 ) -> None:
     for attr in node.get_descendants(vy_ast.Attribute):
+        enum_value = _imported_enum_value(attr)
+        if enum_value is not None:
+            enum = enum_value.enum
+            attr._metadata["is_enum_value"] = True
+            attr._metadata["enum_name"] = enum.name
+            attr._metadata["enum_qualifier"] = enum_value.qualifier
+            continue
         if not isinstance(attr.value, vy_ast.Name):
             parent = getattr(attr, "parent", None)
             is_called_method = (
@@ -338,6 +407,7 @@ def check_enum_value_access(
         members = _enum_members(declaration)
         if attr.attr in members:
             attr._metadata["is_enum_value"] = True
+            attr._metadata["enum_name"] = declaration.name
             continue
         errors.append(
             DamlForgeException(
@@ -444,10 +514,9 @@ def check_unresolved_names(
             if id(name_node) in annotation_names:
                 continue
             parent = getattr(name_node, "parent", None)
-            if (
-                isinstance(parent, vy_ast.Attribute)
-                and parent.value is name_node
-            ) or (isinstance(parent, vy_ast.Call) and parent.func is name_node):
+            if (isinstance(parent, vy_ast.Attribute) and parent.value is name_node) or (
+                isinstance(parent, vy_ast.Call) and parent.func is name_node
+            ):
                 continue
             if name_node.id in local_names or name_node.id in global_names:
                 continue

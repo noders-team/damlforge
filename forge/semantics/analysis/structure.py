@@ -396,7 +396,9 @@ def check_template_signatory(template: vy_ast.TemplateDef, errors: ExceptionList
             target = stmt.target
 
         if isinstance(target, vy_ast.Name) and target.id == "signatory":
-            if isinstance(target.parent,vy_ast.AnnAssign) and isinstance(target.parent.value, vy_ast.List):
+            if isinstance(target.parent, vy_ast.AnnAssign) and isinstance(
+                target.parent.value, vy_ast.List
+            ):
                 if len(target.parent.value.elements) == 0:
                     errors.append(
                         DamlForgeException(
@@ -497,8 +499,7 @@ def check_template_methods(template: vy_ast.TemplateDef, errors: ExceptionList) 
         if not isinstance(fn, vy_ast.FunctionDef):
             continue
         if fn.name == "__init__" or any(
-            _has_decorator(fn, name)
-            for name in ("choice", "checked_fetch", "view")
+            _has_decorator(fn, name) for name in ("choice", "checked_fetch", "view")
         ):
             continue
         if any(
