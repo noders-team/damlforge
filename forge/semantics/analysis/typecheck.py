@@ -295,6 +295,8 @@ class BidirectionalTypeChecker:
             return True
         if self._name(actual) == "None":
             return True
+        if isinstance(actual, TypeVariable):
+            return self.inference.unify(actual, expected)
         if isinstance(actual, AppliedType) and actual.name == "Optional" and actual.args:
             return self._compatible(actual.args[0], expected.args[0], node, call=call)
         if self._compatible(actual, expected.args[0], node, call=call):

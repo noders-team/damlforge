@@ -238,7 +238,12 @@ def _lower_expr_Subscript(node):
     is_list = bool(node._metadata.get("is_list_value")) or (
         base_type is not None and base_type.name == "list"
     )
-    return IRSubscript(lower_expr(node.value), lower_expr(node.slice), is_list=is_list)
+    tuple_arity = (
+        len(base_type.args) if base_type is not None and base_type.name == "tuple" else None
+    )
+    return IRSubscript(
+        lower_expr(node.value), lower_expr(node.slice), is_list=is_list, tuple_arity=tuple_arity
+    )
 
 
 def _lower_expr_Call(node):

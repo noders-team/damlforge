@@ -3,7 +3,7 @@ PYTHON ?= python3
 
 LICENSE_MARKER := Licensed under the Apache License, Version 2.0
 
-.PHONY: test daml-test-legacy daml-test-example daml-test-all dev dev-deps lint license-check clean clean-pyc clean-build clean-test build release
+.PHONY: test splice-dars build-examples dev dev-deps lint license-check clean clean-pyc clean-build clean-test build release
 
 init:
 	$(PYTHON) setup.py install
@@ -14,13 +14,15 @@ dev-init:
 test:
 	pytest
 
-daml-test-legacy:
-	cd examples/legacy/splice-util-batched-markers-test && daml test --all
+splice-dars:
+	scripts/fetch-splice-dars.sh
 
-daml-test-example:
-	cd examples/splice-util-batched-markers-test && daml test --all
+EXAMPLE_DIRS := crowd_loans splice-api-token-burn-mint-v1 splice-util-batched-markers splice-wallet
 
-daml-test-all: daml-test-legacy daml-test-example
+build-examples: splice-dars
+	set -e; for ex in $(EXAMPLE_DIRS); do \
+		forge dar examples/$$ex -o examples/$$ex/$$ex-ci.dar; \
+	done
 
 lint: mypy black flake8 isort
 

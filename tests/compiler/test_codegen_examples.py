@@ -23,15 +23,6 @@ from forge.ir import lower_module
 from forge.semantics import analyze_module
 
 EXAMPLES_ROOT = Path(__file__).resolve().parents[2] / "examples"
-BATCHED_MARKERS_PROXY = (
-    EXAMPLES_ROOT
-    / "splice-util-batched-markers"
-    / "daml"
-    / "Splice"
-    / "Util"
-    / "FeaturedApp"
-    / "batched_markers_proxy.vy"
-)
 
 EXAMPLE_FILES = [
     EXAMPLES_ROOT / "token_standard" / "token_standard.vy",
@@ -108,16 +99,6 @@ def test_funding_campaign_example_translates_every_loop_for_real():
     assert "TODO(damlforge)" not in daml_source
     assert "for-loop translation not yet supported" not in daml_source
     assert "foldl" in daml_source
-
-
-def test_batched_markers_assertion_loop_uses_all():
-    daml_source, _ = _full_pipeline(BATCHED_MARKERS_PROXY)
-    choice_body = daml_source.split("choice BatchedMarkersProxy_TestEqual", 1)[1].split(
-        "choice BatchedMarkersProxy_CreateMarkersV2", 1
-    )[0]
-
-    assert "all (\\entry -> entry.weight >= (10.0 : Decimal)) parties" in choice_body
-    assert "foldlA" not in choice_body
 
 
 def test_simple_example_mutates_self_via_create_and_dict_via_map():

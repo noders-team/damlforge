@@ -291,7 +291,7 @@ def buy_member_traffic(
         )
 
     context = executionContext.paymentContext
-    rules = fetch_public_reference_data(
+    rules: AmuletRules = fetch_public_reference_data(
         ForDso(dso=executionContext.dso),
         context.amulet_rules,
         AmuletRules_Fetch(p=executionContext.validator),
@@ -362,8 +362,8 @@ def executeAmuletOperationRec(
                     cid,
                     AcceptedTransferOffer_Complete(
                         inputs=current_inputs,
-                        transferContext=executionContext.paymentContext,
-                        walletProvider=executionContext.validator,
+                        transfer_context=executionContext.paymentContext,
+                        wallet_provider=executionContext.validator,
                     ),
                 )
                 current_inputs = optional_amulet_inputs(result.senderChangeAmulet)
@@ -423,7 +423,7 @@ def executeAmuletOperationRec(
                         else:
                             buy = co_buy_member_traffic(operation)
                             if buy is not None:
-                                args = buy
+                                args: tuple[int, str, str, int, timedelta, Optional[ContractId[ValidatorTopUpState]]] = buy
                                 result = buy_member_traffic(
                                     executionContext,
                                     current_inputs,
@@ -445,7 +445,7 @@ def executeAmuletOperationRec(
                                         BuyTrafficRequest_Complete(
                                             inputs=current_inputs,
                                             context=executionContext.paymentContext,
-                                            walletProvider=executionContext.validator,
+                                            wallet_provider=executionContext.validator,
                                         ),
                                     )
                                     current_inputs = optional_amulet_inputs(
@@ -507,7 +507,7 @@ def executeAmuletOperationRec(
                                                         TransferPreapprovalProposal_Accept(
                                                             context=executionContext.paymentContext,
                                                             inputs=current_inputs,
-                                                            expiresAt=args[1],
+                                                            expires_at=args[1],
                                                         ),
                                                     )
                                                     if result.amuletPaid > Decimal(0):

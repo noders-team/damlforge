@@ -35,7 +35,7 @@ from forge.ir.nodes import (
 from forge.ir.normalize import LoopAnalysis
 
 _OPTIONAL_METHODS = frozenset({"isSome", "isNone", "fromSome", "fromSomeNote", "fromOptional"})
-_MAX_TUPLE_ACCESSOR_INDEX = 8
+_MAX_TUPLE_ACCESSOR_INDEX = 4
 
 
 def _walk_ir(value):
@@ -91,6 +91,8 @@ def _uses_dynamic_index(
 ) -> bool:
     if expr.is_list:
         return True
+    if expr.tuple_arity is not None:
+        return False
     if (
         isinstance(expr.index, IRConstant)
         and isinstance(expr.index.value, int)
