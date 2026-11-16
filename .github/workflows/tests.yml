@@ -1,0 +1,64 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install package and lint dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . --group lint
+
+      - name: Black
+        run: black --check forge/ tests/ setup.py
+
+      - name: isort
+        run: isort --check-only forge/ tests/ setup.py
+
+      - name: flake8
+        run: flake8 forge/ tests/
+
+      - name: mypy
+        run: mypy -p forge
+
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . --group test
+
+      - name: Run test suite
+        run: make test PYTHON=python

@@ -18,9 +18,9 @@ from typing import Optional
 
 from forge.models.decorators import (
     ChoiceMeta,
-    checked_fetch,
     Consuming,
     InterfaceMeta,
+    checked_fetch,
     choice,
     exception,
     interface,

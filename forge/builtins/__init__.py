@@ -19,10 +19,10 @@ import importlib
 import inspect
 import pkgutil
 import typing
+from abc import ABC, abstractmethod
 from enum import Enum
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Optional, Tuple
-from abc import ABC, abstractmethod
 
 from forge.ast import nodes as vy_ast
 from forge.exceptions import DamlForgeException, ExceptionList

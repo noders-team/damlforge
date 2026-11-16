@@ -15,15 +15,15 @@
 
 from forge.builtins import (
     ChoiceMeta,
-    checked_fetch,
     Consuming,
     InterfaceMeta,
+    checked_fetch,
     choice,
     interface,
+    template,
     variant,
     variant_record,
     view,
-    template,
 )
 
 __all__ = (

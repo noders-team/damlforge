@@ -16,9 +16,9 @@
 from pathlib import Path
 
 from forge.ast.parse import parse_to_ast
-from forge.semantics import analyze_module
-from forge.ir import lower_module
 from forge.codegen import generate_daml
+from forge.ir import lower_module
+from forge.semantics import analyze_module
 
 EXAMPLE_PATH = (
     Path(__file__).resolve().parents[2] / "examples" / "token_standard" / "token_standard.vy"
