@@ -13,7 +13,7 @@ DamlForge compiles `.vy` files (Python syntax, Vyper-flavored keywords) into rea
 
 - Use `python -m forge daml <file-or-directory> -o <directory>` for source generation. A file input produces one `.daml` file and a `.map.json` source map; a directory input covers only `.vy` files directly in that directory.
 - Use `python -m forge dar <project-directory> -o <file.dar>` for a real package build. The project must already have a valid `daml.yaml`; DamlForge recursively compiles `.vy` files below its `source` directory and then invokes DPM.
-- Use `python -m forge stubs <file.dar> -o <directory>` to reconstruct supported declarations as `.vy`. Stub generation requires `pip install 'damlforge[stubgen]'`; a project directory can be supplied instead of a DAR and will be built with DPM.
+- Use `python -m forge stubs <file.dar> -o <directory>` to reconstruct supported declarations as `.vy`. Stub generation uses `dazl`, which is installed with DamlForge; a project directory can be supplied instead of a DAR and will be built with DPM.
 - Use `daml test --all` when test coverage must include templates and choices imported from data-dependency DARs. Plain `daml test` can report only the package-local definitions.
 - DPM is resolved from `PATH`, then `~/.dpm/bin/dpm`; pass `--dpm PATH` when necessary. Add `--traceback` while diagnosing compiler failures. `forge daml --no-i` makes the default error-tolerant multi-file compile fail on the first error.
 

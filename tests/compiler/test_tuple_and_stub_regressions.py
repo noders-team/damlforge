@@ -77,3 +77,55 @@ def test_stub_merge_keeps_field_renames_of_same_named_choices():
         "expected_admin": "expectedAdmin",
         "extra_args": "extraArgs",
     }
+
+
+@pytest.mark.parametrize(
+    "returned, expected",
+    [
+        (
+            "(result.purchased_traffic, result.sender_change_amulet)",
+            "pure (result.purchasedTraffic, result.senderChangeAmulet)",
+        ),
+        ("(result.purchased_traffic, None)", "pure (result.purchasedTraffic, None)"),
+    ],
+)
+def test_tuple_with_optional_element_from_untyped_exercise_is_not_wrapped_in_some(
+    returned, expected
+):
+    daml = _compile(f"""
+from typing import Optional
+from forge.models import Party
+from forge.builtins.daml_lang import exercise
+from Splice.Amulet import Amulet
+from Splice.DecentralizedSynchronizer import MemberTraffic
+from Splice.AmuletRules import (
+    AmuletRules,
+    AmuletRules_BuyMemberTraffic,
+    TransferContext,
+    TransferInput,
+)
+
+def buy(
+    rules: ContractId[AmuletRules],
+    inputs: list[TransferInput],
+    context: TransferContext,
+    provider: Party,
+    dso: Party,
+) -> tuple[ContractId[MemberTraffic], Optional[ContractId[Amulet]]]:
+    result = exercise(
+        rules,
+        AmuletRules_BuyMemberTraffic(
+            inputs=inputs,
+            context=context,
+            provider=provider,
+            member_id="m",
+            synchronizer_id="s",
+            migration_id=1,
+            traffic_amount=2,
+            expected_dso=dso,
+        ),
+    )
+    return {returned}
+""")
+    assert expected in daml
+    assert "Some (" not in daml

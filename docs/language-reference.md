@@ -20,8 +20,8 @@ from `PATH`, then `~/.dpm/bin/dpm`, or can be supplied with `--dpm PATH`.
 Use `forge daml --no-i` to fail on the first file error instead of continuing with
 the remaining files. Use `--traceback` on any command for the Python traceback.
 
-Stub generation accepts a DAR or a Daml project directory. It requires the optional
-`damlforge[stubgen]` extra (for Daml-LF decoding), and `--module MODULE` may be repeated
+Stub generation accepts a DAR or a Daml project directory. It uses `dazl` (installed
+with DamlForge) for Daml-LF decoding, and `--module MODULE` may be repeated
 to select modules from the main package or any dependency. Unsupported declarations
 are skipped and reported.
 
