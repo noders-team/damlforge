@@ -168,6 +168,10 @@ class StubMetadata:
             source = getattr(other, f.name)
             if f.name in _NAME_KEYED and names is not None:
                 source = _restrict(source, names)
+            if f.name == "type_field_renames":
+                for owner, renames in source.items():
+                    self.type_field_renames.setdefault(owner, {}).update(renames)
+                continue
             getattr(self, f.name).update(source)
 
 

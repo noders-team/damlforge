@@ -61,6 +61,7 @@ class IRSubscript:
     value: "IRExpr"
     index: "IRExpr"
     is_list: bool = False
+    tuple_arity: int | None = None
 
 
 @dataclass(frozen=True)

@@ -138,7 +138,8 @@ _CONSUMING_KEYWORD = {
     Consuming.POST_CONSUMING: "postconsuming ",
 }
 
-_MAX_TUPLE_ACCESSOR_INDEX = 8
+_MAX_TUPLE_ACCESSOR_INDEX = 4
+_MAX_TUPLE_ACCESSOR_ARITY = 5
 
 
 def _required_field_type(f: Field) -> TypeRef:
@@ -316,6 +317,11 @@ def _render_subscript(e: IRSubscript) -> str:
         and isinstance(e.index.value, int)
         and e.index.value >= 0
     ):
+        arity = e.tuple_arity
+        if arity is not None and arity > _MAX_TUPLE_ACCESSOR_ARITY and e.index.value < arity:
+            slots = ["_"] * arity
+            slots[e.index.value] = "tuple_item"
+            return f"(case {render_expr(e.value)} of ({', '.join(slots)}) -> tuple_item)"
         if e.index.value <= _MAX_TUPLE_ACCESSOR_INDEX:
             return f"{_render_atom_for_attr(e.value)}._{e.index.value + 1}"
     return f"({render_expr(e.value)}) !! ({render_expr(e.index)})"

@@ -41,6 +41,8 @@ class FieldScope:
         return name if name in self.user_fields else self.unique.get(name, name)
 
     def keyword(self, owner: Optional[str], name: str) -> str:
+        if owner not in self.renames and owner is not None and "." in owner:
+            owner = owner.rsplit(".", 1)[1]
         return self.renames.get(owner, {}).get(name, name)
 
 
