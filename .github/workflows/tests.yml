@@ -41,6 +41,24 @@ jobs:
       - name: mypy
         run: mypy -p forge
 
+  cli-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install package without optional extras
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+
+      - name: Start the forge CLI
+        run: forge --help
+
   pytest:
     runs-on: ubuntu-latest
     strategy:
