@@ -39,28 +39,12 @@ def collect_marker_beneficiaries_v2(batches: list[RewardBatchV2]) -> list[Party]
     return beneficiaries
 
 
-struct PartyWithWeight:
-    party: Party
-    weight: Decimal
-
-
-def sum_weights(parties: list[PartyWithWeight]) -> Decimal:
-    total_weight = Decimal(0)
-    for entry: PartyWithWeight in parties:
-        total_weight = total_weight + entry.weight
-    return total_weight
-
 @template
 class BatchedMarkersProxy:
     provider: Party
     dso: Party
 
     signatory: Party = provider
-
-    tested_string: str
-
-    def __init__(self, tested_string: str):
-        assert len(tested_string) <= 10
 
     @DamlName("BatchedMarkersProxy_CreateMarkers")
     @choice(
@@ -73,10 +57,6 @@ class BatchedMarkersProxy:
         featured_app_right_cid: ContractId[FeaturedAppRightV1.FeaturedAppRight],
         batches: list[RewardBatch],
     ) -> BatchedMarkersProxy_CreateMarkersResult:
-        #if len(batches) >= 128:
-        #    return None
-        assert len(batches) >= 128, "batches should be less then 128"
-            
         for batch: RewardBatch in batches:
             assert batch.num_markers > 0, "numMarkers > 0"
 
@@ -101,30 +81,6 @@ class BatchedMarkersProxy:
             results.append(batch_results)
 
         return BatchedMarkersProxy_CreateMarkersResult(results=results)
-
-    @DamlName("BatchedMarkersProxy_TestEqual")
-    @choice(
-        controller=provider,
-        consuming=False,
-        observer=[dso],
-    )
-    def test_equal(self, val1: bool, val2: bool, parties: list[PartyWithWeight]) -> bool:
-        for entry: PartyWithWeight in parties:
-            assert entry.weight >= Decimal(10.0), "weight >= 10.0"
-
-        return val1 == val2
-
-    @choice(
-        controller=provider,
-        consuming=True,
-        observer=[dso],
-    )
-    @DamlName("BatchedMarkersProxy_TestSumWeights")
-    def test_sum_weights(self, parties: list[PartyWithWeight]) -> Decimal:
-        total_weight = Decimal(0)
-        for entry: PartyWithWeight in parties:
-            total_weight = total_weight + entry.weight
-        return total_weight
 
     @DamlName("BatchedMarkersProxy_CreateMarkersV2")
     @choice(
