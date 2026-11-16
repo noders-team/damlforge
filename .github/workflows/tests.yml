@@ -64,31 +64,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        python: ["python311", "python312", "python313"]
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: cachix/install-nix-action@v31
         with:
-          python-version: ${{ matrix.python-version }}
-          cache: pip
-
-      - name: Install package and test dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install . --group test
+          extra_nix_config: experimental-features = nix-command flakes
 
       - name: Cache dpm and Daml SDKs
         uses: actions/cache@v4
         with:
           path: ~/.dpm
-          key: dpm-${{ runner.os }}-${{ hashFiles('tests/stubgen/fixtures/keys/daml.yaml') }}
-
-      - name: Install dpm
-        run: |
-          curl -sSfL https://get.digitalasset.com/install/install.sh | sh
-          echo "$HOME/.dpm/bin" >> "$GITHUB_PATH"
-          "$HOME/.dpm/bin/dpm" version
+          key: dpm-${{ runner.os }}-${{ hashFiles('tests/stubgen/fixtures/keys/daml.yaml', 'nix/dpm.nix') }}
 
       - name: Run test suite
-        run: make test PYTHON=python
+        run: |
+          nix develop ./nix#${{ matrix.python }} --command bash -euo pipefail -c '
+            dpm version
+            (cd tests/stubgen/fixtures/keys && dpm install package)
+            python -m venv .venv
+            . .venv/bin/activate
+            pip install --upgrade pip
+            pip install . --group test
+            make test PYTHON=python
+          '
