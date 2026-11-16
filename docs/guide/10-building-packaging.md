@@ -197,6 +197,32 @@ its dependencies. Unsupported declarations are skipped and reported by the comma
 - **Separate by business domain.** Stakeholders can review and upload only the
   packages for the workflows they take part in.
 
+## Example dependencies
+
+The Splice examples in [`examples`](../../examples) depend on published Splice
+DARs. They are not committed. `scripts/fetch-splice-dars.sh` downloads them into
+`examples/dars` from the `hyperledger-labs/splice` commit named by `SPLICE_REF` in
+the script, and checks each file against the SHA-256 sums in
+`scripts/splice-dars.sha256`. To use another Splice revision, change `SPLICE_REF`
+and regenerate the sums file.
+
+```
+make splice-dars       # download and verify the DARs
+make build-examples    # build every example from its .vy sources
+```
+
+Each example needs its Daml SDK installed first: run `dpm install package` inside
+the example directory. The `examples-build` job in `.github/workflows/tests.yml`
+does exactly this on every pull request.
+
+## Checking upgrades
+
+Set `upgrades: <previous>.dar` in `daml.yaml` and `forge dar` runs the Daml
+smart-contract-upgrade check as part of the build. Adding an `Optional` field is
+accepted. Changing a field's type is rejected, and the error points at the `.vy`
+line. `tests/upgrade/test_scu.py` builds both cases from the fixtures in
+`tests/upgrade/fixtures`.
+
 ## Next steps
 
 [Variants](11-variants.md) goes deeper into sum types: payload styles, recursive
