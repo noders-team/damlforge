@@ -128,7 +128,7 @@ With pip, pin it in `requirements.txt`:
 damlforge==<version>
 ```
 
-Use `damlforge[stubgen]==<version>` instead if you also run `forge stubs`. Then install and build:
+Then install and build:
 
 ```bash
 pip install -r requirements.txt
@@ -139,7 +139,6 @@ With Poetry, add it to a dev group, since it's only needed at build time:
 
 ```bash
 poetry add --group dev damlforge@<version>
-poetry add --group dev 'damlforge[stubgen]@<version>'   # if you also run forge stubs
 ```
 
 This records it in your `pyproject.toml`:
@@ -211,7 +210,7 @@ forge stubs input.dar -o generated/         # .dar -> generated .vy stubs
 ```
 
 `forge <path> [options]` (no subcommand) is shorthand for `forge daml <path> [options]`.
-`forge stubs` needs `pip install 'damlforge[stubgen]'`.
+`forge stubs` uses `dazl`, which is installed together with DamlForge.
 
 See [Building and Packaging](https://docs.damlforge.noders.services/guide/building-packaging/) for `daml.yaml`
 requirements, DPM options, and stub generation.

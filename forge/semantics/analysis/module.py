@@ -21,7 +21,6 @@ from forge.exceptions import DamlForgeException, ExceptionList
 from forge.models.error_codes import ErrorCodes
 from forge.semantics.analysis.intrinsics import DatetimeIntrinsicAnalyzer
 from forge.semantics.analysis.primitive_values import check_primitive_policies
-from forge.semantics.analysis.typecheck import check_bidirectional_types
 from forge.semantics.analysis.structure import (
     _reachable_modules,
     check_container,
@@ -30,6 +29,7 @@ from forge.semantics.analysis.structure import (
     check_unsupported_control_flow,
     infer_ledger_effects,
 )
+from forge.semantics.analysis.typecheck import check_bidirectional_types
 from forge.semantics.analysis.types import (
     ModuleScope,
     check_call_arity,

@@ -118,12 +118,8 @@ pip install --group lint
 ### Optional: stub generation
 
 `forge stubs` rebuilds `.vy` declarations from an existing DAR so your contracts
-can import types from packages written in plain Daml. It needs one extra
-dependency:
-
-```bash
-pip install 'damlforge[stubgen]'
-```
+can import types from packages written in plain Daml. It uses `dazl`, which
+is installed together with DamlForge.
 
 ## Verifying the installation
 

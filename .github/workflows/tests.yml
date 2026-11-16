@@ -1,0 +1,91 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install package and lint dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install . --group lint
+
+      - name: Black
+        run: black --check forge/ tests/ setup.py
+
+      - name: isort
+        run: isort --check-only forge/ tests/ setup.py
+
+      - name: flake8
+        run: flake8 forge/ tests/
+
+      - name: mypy
+        run: mypy -p forge
+
+  cli-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install package without optional extras
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install .
+
+      - name: Start the forge CLI
+        run: forge --help
+
+  pytest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["python311", "python312", "python313"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: experimental-features = nix-command flakes
+
+      - name: Cache dpm and Daml SDKs
+        uses: actions/cache@v4
+        with:
+          path: ~/.dpm
+          key: dpm-${{ runner.os }}-${{ hashFiles('tests/stubgen/fixtures/keys/daml.yaml', 'nix/dpm.nix') }}
+
+      - name: Run test suite
+        run: |
+          nix develop ./nix#${{ matrix.python }} --command bash -euo pipefail -c '
+            dpm version
+            (cd tests/stubgen/fixtures/keys && dpm install package)
+            python -m venv .venv
+            . .venv/bin/activate
+            pip install --upgrade pip
+            pip install . --group test
+            make test PYTHON=python
+          '
