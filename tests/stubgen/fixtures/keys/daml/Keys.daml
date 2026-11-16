@@ -1,0 +1,41 @@
+module Keys where
+
+data AccountKey = AccountKey with
+    bank : Party
+    number : Text
+  deriving (Eq, Show)
+
+template Account
+  with
+    bank : Party
+    owner : Party
+    number : Text
+  where
+    signatory bank
+    observer owner
+    key (bank, number) : (Party, Text)
+    maintainer key._1
+
+template Wallet
+  with
+    owner : Party
+  where
+    signatory owner
+    key owner : Party
+    maintainer key
+
+template Deposit
+  with
+    bank : Party
+    number : Text
+    amount : Int
+  where
+    signatory bank
+    key AccountKey with bank; number : AccountKey
+    maintainer key.bank
+
+template Note
+  with
+    author : Party
+  where
+    signatory author

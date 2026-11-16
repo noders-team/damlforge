@@ -1,0 +1,6 @@
+sdk-version: 3.5.2
+name: stubgen-keys
+version: 0.0.1
+source: daml
+dependencies: [daml-prim, daml-stdlib]
+build-options: [--target=2.3]

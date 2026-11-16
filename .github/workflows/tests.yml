@@ -78,5 +78,17 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install . --group test
 
+      - name: Cache dpm and Daml SDKs
+        uses: actions/cache@v4
+        with:
+          path: ~/.dpm
+          key: dpm-${{ runner.os }}-${{ hashFiles('tests/stubgen/fixtures/keys/daml.yaml') }}
+
+      - name: Install dpm
+        run: |
+          curl -sSfL https://get.digitalasset.com/install/install.sh | sh
+          echo "$HOME/.dpm/bin" >> "$GITHUB_PATH"
+          "$HOME/.dpm/bin/dpm" version
+
       - name: Run test suite
         run: make test PYTHON=python

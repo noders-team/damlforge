@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from pathlib import Path
 
 import pytest
@@ -22,8 +23,22 @@ lf = pytest.importorskip("dazl.damlast.daml_lf_1")
 stubgen = pytest.importorskip("forge.stubgen")
 exports = pytest.importorskip("forge.stubgen.exports")
 lf2 = pytest.importorskip("forge.stubgen.lf2")
+resolve_dpm_path = pytest.importorskip("forge.cli.forge_dar")._resolve_dpm_path
 
-FIXTURE_DAR = Path(__file__).parent / "fixtures" / "keys" / "stubgen-keys.dar"
+KEYS_PROJECT = Path(__file__).parent / "fixtures" / "keys"
+
+
+@pytest.fixture(scope="module")
+def keys_stub(tmp_path_factory):
+    try:
+        resolve_dpm_path(None)
+    except RuntimeError as exc:
+        if os.environ.get("CI"):
+            pytest.fail(str(exc))
+        pytest.skip("dpm is required to build the stubgen keys fixture")
+    out_dir = tmp_path_factory.mktemp("keys_stubs")
+    stubgen.generate_stubs(KEYS_PROJECT, out_dir, modules=("Keys",))
+    return (out_dir / "Keys.vy").read_text()
 
 
 def _builtin(name: str):
@@ -90,11 +105,8 @@ def test_export_items_accepts_qualified_names(source, expected):
         ("Note", []),
     ],
 )
-def test_stubs_render_contract_keys_from_lf_2_3_dar(tmp_path, template, expected):
-    stubgen.generate_stubs(FIXTURE_DAR, tmp_path, modules=("Keys",))
-    block = (
-        (tmp_path / "Keys.vy").read_text().split(f"class {template}:", 1)[1].split("@template")[0]
-    )
+def test_stubs_render_contract_keys_from_lf_2_3_dar(keys_stub, template, expected):
+    block = keys_stub.split(f"class {template}:", 1)[1].split("@template")[0]
 
     assert all(line in block for line in expected)
     assert ("key:" in block) is bool(expected)

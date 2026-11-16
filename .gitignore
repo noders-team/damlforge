@@ -69,12 +69,13 @@ repros/
 commitmsg.txt
 .agent-files/
 *.daml
+!tests/stubgen/fixtures/keys/daml/Keys.daml
 */*/*.map.json
 */*/*.json
 !docs/webpage/*.json
 examples/*/.daml/
 examples/*/*.dar
+tests/stubgen/fixtures/**/*.dar
 examples/legacy/**
 examples/earnout
-tests/stubgen/fixtures/keys
 .claude/*
