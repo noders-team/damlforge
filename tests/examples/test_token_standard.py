@@ -62,6 +62,7 @@ def test_burn_mint_interface():
     source, map = generate_daml(lowered)
     assert source is not None
     assert map is not None
+    assert "interface instance Holding for ExternalHolding where" in source
     assert "burnMintFactory_BurnMintImpl" in source
     assert "burnMintFactory_PublicFetchImpl" in source
 

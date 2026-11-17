@@ -1,6 +1,6 @@
-from forge.models import ContractId, Decimal, Party, choice
+from forge.models import ContractId, Decimal, Party, choice, template, view
 from forge.builtins import DamlName
-from Splice.Api.Token.HoldingV1 import Holding, InstrumentId
+from Splice.Api.Token.HoldingV1 import Holding, HoldingView, InstrumentId
 from Splice.Api.Token.MetadataV1 import ChoiceContext, ExtraArgs, Metadata
 
 
@@ -17,6 +17,25 @@ struct BurnMintFactory_BurnMintResult:
 struct BurnMintFactoryView:
     admin: Party
     meta: Metadata
+
+
+@template
+class ExternalHolding(Holding):
+    owner: Party
+    instrument_id: InstrumentId
+    amount: Decimal
+
+    signatory: list[Party] = [instrument_id.admin, owner]
+
+    @view
+    def get_view(self) -> HoldingView:
+        return HoldingView(
+            owner=self.owner,
+            instrument_id=self.instrument_id,
+            amount=self.amount,
+            lock=None,
+            meta=Metadata(values={}),
+        )
 
 
 interface BurnMintFactory(view=BurnMintFactoryView):

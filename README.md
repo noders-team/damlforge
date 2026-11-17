@@ -223,6 +223,7 @@ The [`examples/`](examples) directory has complete projects to compile and study
 |---|---|
 | [`examples/basic/`](examples/basic) | Templates, interfaces, cross-module imports |
 | [`examples/token_standard/`](examples/token_standard) | A Splice token-standard holding and transfer flow |
+| [`examples/splice-api-token-burn-mint-v1/`](examples/splice-api-token-burn-mint-v1) | A template implementing the external Splice `Holding` interface |
 | [`examples/crowd_loans/`](examples/crowd_loans) | Enums, `GenMap`, nested loops, Splice data dependencies |
 | [`examples/splice-util-batched-markers/`](examples/splice-util-batched-markers) | A Splice featured-app template with structs, choices, and Splice API data dependencies |
 

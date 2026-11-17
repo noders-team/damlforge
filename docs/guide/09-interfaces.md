@@ -195,6 +195,21 @@ view's owner, now Bob.
 daml/HoldingTest.daml:holding_test: ok, 4 active contracts, 8 transactions.
 ```
 
+## Implementing an interface from an external DAR
+
+The repository also contains a concrete template implementing the Splice Token
+Standard `Holding` interface imported from the external
+`splice-api-token-holding-v1` DAR:
+
+```text
+examples/splice-api-token-burn-mint-v1/daml/Splice/Api/Token/burn_mint_v1.vy
+```
+
+`ExternalHolding(Holding)` uses the imported `HoldingView` and is compiled by
+`make build-examples` against the pinned Splice DARs. The generated Daml must
+contain `interface instance Holding for ExternalHolding`, which is also covered
+by `tests/examples/test_token_standard.py`.
+
 ## Interfaces and templates in one package
 
 `damlc` warns when an interface and its implementations are in the same package,
