@@ -67,6 +67,32 @@ def test_burn_mint_interface():
     assert "burnMintFactory_PublicFetchImpl" in source
 
 
+def test_burn_mint_implements_holding_from_external_package():
+    source_path = (
+        Path(__file__).resolve().parents[2]
+        / "examples"
+        / "splice-api-token-burn-mint-v1"
+        / "daml"
+        / "Splice"
+        / "Api"
+        / "Token"
+        / "burn_mint_v1.vy"
+    )
+    module = parse_to_ast(
+        source_path.read_text(), module_path="burn_mint_v1.vy", resolved_path=str(source_path)
+    )
+    analyze_module(module)
+    source, _ = generate_daml(lower_module(module))
+
+    declared = {node.name for node in module.body if hasattr(node, "name")}
+    assert "Holding" not in declared
+    assert "ExternalHolding" in declared
+    assert (
+        "import Splice.Api.Token.HoldingV1 (Holding, HoldingView(..), InstrumentId(..))" in source
+    )
+    assert "interface instance Holding for ExternalHolding where" in source
+
+
 def test_token_standard_example_declares_expected_containers():
     source = EXAMPLE_PATH.read_text()
     assert source is not None
