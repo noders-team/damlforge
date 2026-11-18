@@ -226,7 +226,7 @@ The [`examples/`](examples) directory has complete projects to compile and study
 | [`examples/splice-api-token-burn-mint-v1/`](examples/splice-api-token-burn-mint-v1) | A template implementing the external Splice `Holding` interface |
 | [`examples/crowd_loans/`](examples/crowd_loans) | Enums, `GenMap`, nested loops, Splice data dependencies |
 | [`examples/splice-util-batched-markers/`](examples/splice-util-batched-markers) | A Splice featured-app template with structs, choices, and Splice API data dependencies |
-| [`examples/splice-util-batched-markers-test/`](examples/splice-util-batched-markers-test) | Daml Script tests run against both the generated and the original package |
+| [`examples/splice-util-batched-markers-test/`](examples/splice-util-batched-markers-test) | the upstream Splice Daml Script test, run against both the generated and the original package |
 
 Every example and test package pins Daml SDK `3.5.2` (`sdk-version` in its `daml.yaml`).
 
@@ -252,9 +252,11 @@ hand-written, is built with Daml SDK `3.5.2`:
    templates, choices and field names as the original. These tests are the only
    committed `.daml` files in `examples/` besides the original; `.gitignore` allows
    `examples/*-test/daml/**/*.daml` and `examples/*-original/daml/**/*.daml`.
-5. `dpm test` runs the scripts. They cover both choices of `BatchedMarkersProxy` and
-   the guards that must abort: an empty batch, more than 10000 markers, a marker
-   weight below 1.0, and a mismatched DSO.
+5. `dpm test` runs the upstream Splice test `Splice.Util.FeaturedApp.UnitTests.BatchedMarkersProxy`,
+   copied unchanged from `daml/splice-util-batched-markers-test` in Splice. It runs on the
+   Splice Amulet test registry (`Splice/Testing/**`, copied unchanged from
+   `token-standard/splice-token-standard-v1-test`), and exercises `CreateMarkers` and
+   `CreateMarkersV2` against real featured-app rights and checks the created markers.
 
 #### Why the generated loops differ from the original
 

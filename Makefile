@@ -1,5 +1,6 @@
 VERSION ?= 0.0.15
 PYTHON ?= python3
+export PATH := $(HOME)/.dpm/bin:$(PATH)
 
 LICENSE_MARKER := Licensed under the Apache License, Version 2.0
 
