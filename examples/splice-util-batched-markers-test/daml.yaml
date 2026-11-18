@@ -1,0 +1,14 @@
+sdk-version: 3.5.2
+name: splice-util-batched-markers-test
+source: daml
+version: 1.0.0
+dependencies:
+  - daml-prim
+  - daml-script
+  - daml-stdlib
+data-dependencies:
+  - ../dars/splice-api-featured-app-v1-1.0.0.dar
+  - ../dars/splice-api-featured-app-v2-1.0.0.dar
+  - ../splice-util-batched-markers/splice-util-batched-markers-ci.dar
+build-options:
+  - --target=2.1

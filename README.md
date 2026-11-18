@@ -226,6 +226,59 @@ The [`examples/`](examples) directory has complete projects to compile and study
 | [`examples/splice-api-token-burn-mint-v1/`](examples/splice-api-token-burn-mint-v1) | A template implementing the external Splice `Holding` interface |
 | [`examples/crowd_loans/`](examples/crowd_loans) | Enums, `GenMap`, nested loops, Splice data dependencies |
 | [`examples/splice-util-batched-markers/`](examples/splice-util-batched-markers) | A Splice featured-app template with structs, choices, and Splice API data dependencies |
+| [`examples/splice-util-batched-markers-test/`](examples/splice-util-batched-markers-test) | Daml Script tests run against both the generated and the original package |
+
+Every example and test package pins Daml SDK `3.5.2` (`sdk-version` in its `daml.yaml`).
+
+### How the examples are verified
+
+CI compiles each example from its `.vy` sources and then runs Daml Script
+tests against the generated code. All Daml in this repository, generated and
+hand-written, is built with Daml SDK `3.5.2`:
+
+1. `scripts/fetch-splice-dars.sh` downloads the pinned Splice DARs into
+   `examples/dars/` and checks them against `scripts/splice-dars.sha256`.
+2. `forge dar examples/<name> -o examples/<name>/<name>-ci.dar` compiles every
+   `.vy` file to Daml and runs `dpm build`. The generated `.daml` files and DARs
+   are git-ignored and rebuilt on every run.
+3. `examples/splice-util-batched-markers-original` is the hand-written Splice
+   `BatchedMarkersProxy`, built with plain `dpm build`. The only edit is removing
+   `Serializable` from `deriving`, which Daml 3 no longer has.
+4. Two test packages share one Daml Script source,
+   `examples/splice-util-batched-markers-test/daml`. `splice-util-batched-markers-test`
+   depends on the DAR generated from the `.vy`;
+   `splice-util-batched-markers-original-test` depends on the DAR of the hand-written
+   original. Both run the same tests, so the generated package must expose the same
+   templates, choices and field names as the original. These tests are the only
+   committed `.daml` files in `examples/` besides the original; `.gitignore` allows
+   `examples/*-test/daml/**/*.daml` and `examples/*-original/daml/**/*.daml`.
+5. `dpm test` runs the scripts. They cover both choices of `BatchedMarkersProxy` and
+   the guards that must abort: an empty batch, more than 10000 markers, a marker
+   weight below 1.0, and a mismatched DSO.
+
+#### Why the generated loops differ from the original
+
+The two packages are not textually identical, and the tests check behaviour, not text.
+Daml has no mutable variables, so DamlForge turns a `.vy` `for` loop that updates an
+accumulator into a fold:
+
+| `.vy` / original | Generated Daml |
+|---|---|
+| `for batch in batches: total = total + batch.numMarkers` | `foldl (\(total, ...) batch -> ...) (total, None) batches` |
+| loop body that calls `exercise` (a ledger action) | `foldlA`, the monadic fold, so the actions run in order |
+| `range(0, n)` | `[0 .. n - 1]`; the original writes `forA [1..n]` |
+| `results.append(x)` | `results <> [x]`, threaded through the fold; the original uses `forA`, which returns the list directly |
+| `assert` on a sum | the sum is computed by the fold first, then `assertMsg`; the original uses `sum` and `require` |
+
+Both forms run the same number of iterations in the same order, create the same
+contracts and abort on the same inputs. The shared Daml Script source checks exactly that:
+the marker counts and weights for both choices, and the four guards that must abort.
+A mismatch in an index range, the order of results, or an assertion would fail one package
+and not the other.
+
+Run the whole loop locally with `make test-examples`, after `dpm install package`
+in each example directory. The `examples-build` job in
+`.github/workflows/tests.yml` does the same on every push.
 
 ## Building the wheel yourself
 

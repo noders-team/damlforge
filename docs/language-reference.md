@@ -134,6 +134,7 @@ from forge.builtins import DamlName
 | `@view` | method inside `interface`, or a `template` that implements one | no args (`DF1206`); banned inside a `template` with no interface bases (`DF1207`) |
 | `@variant_record` | constructor method inside an `@variant` class | bare only; emits a named-field Daml constructor using `with` instead of a positional payload |
 | `@DamlName("RealName")` | any function/choice | exactly one string-literal positional arg (`DF1221`); overrides the auto-derived Daml-side name |
+| `Annotated[T, DamlName("realName")]` | struct, template or variant-record field, or choice parameter | sets the Daml-side field name; Python code keeps using the `.vy` name, and generated field access, constructor keywords and choice-body references use the Daml name |
 | `@template` | immediately before `class Foo:`, nothing else | class marker imported from `forge.models`; see §1 |
 | `@variant` | immediately before `class Foo:`, nothing else | class marker imported from `forge.models`; see §1 and §9 |
 

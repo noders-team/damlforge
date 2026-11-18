@@ -15,12 +15,12 @@ struct BatchedMarkersProxy_CreateMarkersV2Result:
 
 struct RewardBatch:
     beneficiaries: list[FeaturedAppRightV1.AppRewardBeneficiary]
-    num_markers: int
+    num_markers: Annotated[int, DamlName("numMarkers")]
 
 
 struct RewardBatchV2:
     beneficiaries: list[FeaturedAppRightV2.AppRewardBeneficiary]
-    marker_weight: Decimal
+    marker_weight: Annotated[Decimal, DamlName("markerWeight")]
 
 
 def collect_marker_beneficiaries(batches: list[RewardBatch]) -> list[Party]:
@@ -54,7 +54,9 @@ class BatchedMarkersProxy:
     )
     def batched_markers_proxy_create_markers(
         self,
-        featured_app_right_cid: ContractId[FeaturedAppRightV1.FeaturedAppRight],
+        featured_app_right_cid: Annotated[
+            ContractId[FeaturedAppRightV1.FeaturedAppRight], DamlName("featuredAppRightCid")
+        ],
         batches: list[RewardBatch],
     ) -> BatchedMarkersProxy_CreateMarkersResult:
         for batch: RewardBatch in batches:
@@ -90,7 +92,9 @@ class BatchedMarkersProxy:
     )
     def batched_markers_proxy_create_markers_v2(
         self,
-        featured_app_right_cid: ContractId[FeaturedAppRightV2.FeaturedAppRight],
+        featured_app_right_cid: Annotated[
+            ContractId[FeaturedAppRightV2.FeaturedAppRight], DamlName("featuredAppRightCid")
+        ],
         batches: list[RewardBatchV2],
     ) -> BatchedMarkersProxy_CreateMarkersV2Result:
         for batch: RewardBatchV2 in batches:

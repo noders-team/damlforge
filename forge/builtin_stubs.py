@@ -67,7 +67,7 @@ def _bool_keyword(dec, name: str) -> bool:
     )
 
 
-def _annotated_name(annotation) -> Optional[str]:
+def annotated_name(annotation) -> Optional[str]:
     if getattr(getattr(annotation, "value", None), "id", None) != "Annotated":
         return None
     metas = getattr(annotation.slice, "elements", ())[1:]
@@ -105,7 +105,7 @@ class StubMetadata:
 
     def record(self, owner: str, pairs) -> None:
         for name, annotation in pairs:
-            if (daml_name := _annotated_name(annotation)) is not None:
+            if (daml_name := annotated_name(annotation)) is not None:
                 self.type_field_renames.setdefault(owner, {})[name] = daml_name
         self.field_types[owner] = {n: _type(a) for n, a in pairs if a is not None}
         self.constructor_types.add(owner)
@@ -136,7 +136,7 @@ class StubMetadata:
             self.names.add(ctor.name)
             self.constructor_of[ctor.name] = node.name
             for arg in ctor.args.args:
-                if (daml_name := _annotated_name(arg.annotation)) is not None:
+                if (daml_name := annotated_name(arg.annotation)) is not None:
                     self.type_field_renames.setdefault(ctor.name, {})[arg.arg] = daml_name
 
     @classmethod

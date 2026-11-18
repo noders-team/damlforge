@@ -70,6 +70,8 @@ commitmsg.txt
 .agent-files/
 *.daml
 !tests/stubgen/fixtures/keys/daml/Keys.daml
+!examples/*-test/daml/**/*.daml
+!examples/*-original/daml/**/*.daml
 */*/*.map.json
 */*/*.json
 !docs/webpage/*.json

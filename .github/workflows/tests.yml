@@ -105,16 +105,16 @@ jobs:
           path: ~/.dpm
           key: dpm-examples-${{ runner.os }}-${{ hashFiles('examples/*/daml.yaml', 'nix/dpm.nix') }}
 
-      - name: Build every example from its .vy sources
+      - name: Build every example from its .vy sources and run the Daml Script tests
         run: |
           nix develop ./nix#python313 --command bash -euo pipefail -c '
             dpm version
-            for dir in crowd_loans splice-api-token-burn-mint-v1 splice-util-batched-markers splice-wallet; do
+            for dir in crowd_loans splice-api-token-burn-mint-v1 splice-util-batched-markers splice-util-batched-markers-original splice-util-batched-markers-test splice-util-batched-markers-original-test splice-wallet; do
               (cd examples/$dir && dpm install package)
             done
             python -m venv .venv
             . .venv/bin/activate
             pip install --upgrade pip
             pip install .
-            make build-examples
+            make test-examples
           '

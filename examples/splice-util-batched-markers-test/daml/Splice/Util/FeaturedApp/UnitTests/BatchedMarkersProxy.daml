@@ -1,0 +1,139 @@
+module Splice.Util.FeaturedApp.UnitTests.BatchedMarkersProxy where
+
+import DA.Assert
+import DA.List (sort)
+import Daml.Script
+import qualified Splice.Api.FeaturedAppRightV1 as V1
+import qualified Splice.Api.FeaturedAppRightV2 as V2
+import Splice.Util.FeaturedApp.BatchedMarkersProxy
+
+template TestFeaturedAppRight
+  with
+    dso : Party
+    provider : Party
+  where
+    signatory provider
+    observer dso
+
+    interface instance V1.FeaturedAppRight for TestFeaturedAppRight where
+      view = V1.FeaturedAppRightView with dso, provider
+      featuredAppRight_CreateActivityMarkerImpl _self arg = do
+        markers <- forA arg.beneficiaries $ \b ->
+          create TestMarker with dso, provider, beneficiary = b.beneficiary, weight = 1.0
+        pure V1.FeaturedAppRight_CreateActivityMarkerResult with
+          activityMarkerCids = map toInterfaceContractId markers
+
+    interface instance V2.FeaturedAppRight for TestFeaturedAppRight where
+      view = V2.FeaturedAppRightView with dso, provider
+      featuredAppRight_CreateActivityMarkerImpl _self arg = do
+        let markerWeight = optional 1.0 identity arg.weight
+        markers <- forA arg.beneficiaries $ \b ->
+          create TestMarker with dso, provider, beneficiary = b.beneficiary, weight = markerWeight
+        pure V2.FeaturedAppRight_CreateActivityMarkerResult with
+          activityMarkerCids = map toInterfaceContractId markers
+
+template TestMarker
+  with
+    dso : Party
+    provider : Party
+    beneficiary : Party
+    weight : Decimal
+  where
+    signatory provider
+    observer dso, beneficiary
+
+    interface instance V1.FeaturedAppActivityMarker for TestMarker where
+      view = V1.FeaturedAppActivityMarkerView with dso, provider, beneficiary, weight
+
+    interface instance V2.FeaturedAppActivityMarker for TestMarker where
+      view = V2.FeaturedAppActivityMarkerView with dso, provider, beneficiary, weight
+
+data Setup = Setup
+  with
+    dso : Party
+    provider : Party
+    beneficiary : Party
+    proxy : ContractId BatchedMarkersProxy
+    rightV1 : ContractId V1.FeaturedAppRight
+    rightV2 : ContractId V2.FeaturedAppRight
+
+setup : Script Setup
+setup = do
+  dso <- allocateParty "dso"
+  provider <- allocateParty "provider"
+  beneficiary <- allocateParty "beneficiary"
+  right <- submit provider $ createCmd TestFeaturedAppRight with dso, provider
+  proxy <- submit provider $ createCmd BatchedMarkersProxy with provider, dso
+  pure Setup with
+    dso, provider, beneficiary, proxy
+    rightV1 = toInterfaceContractId right
+    rightV2 = toInterfaceContractId right
+
+batch : Party -> Party -> Int -> RewardBatch
+batch provider beneficiary count = RewardBatch with
+  beneficiaries =
+    [ V1.AppRewardBeneficiary provider 0.8
+    , V1.AppRewardBeneficiary beneficiary 0.2
+    ]
+  numMarkers = count
+
+batchV2 : Party -> Decimal -> RewardBatchV2
+batchV2 beneficiary markerWeight = RewardBatchV2 with
+  beneficiaries = [V2.AppRewardBeneficiary beneficiary 1.0]
+  markerWeight = markerWeight
+
+markerCount : Party -> Script Int
+markerCount provider = length <$> query @TestMarker provider
+
+testCreateMarkersV1 : Script ()
+testCreateMarkersV1 = do
+  Setup{..} <- setup
+  result <- submit provider $ exerciseCmd proxy BatchedMarkersProxy_CreateMarkers with
+    featuredAppRightCid = rightV1
+    batches = [batch provider beneficiary 3, batch provider beneficiary 2]
+  map length result.results === [3, 2]
+  markerCount provider >>= (=== 10)
+
+testCreateMarkersV2 : Script ()
+testCreateMarkersV2 = do
+  Setup{..} <- setup
+  result <- submit provider $ exerciseCmd proxy BatchedMarkersProxy_CreateMarkersV2 with
+    featuredAppRightCid = rightV2
+    batches = [batchV2 beneficiary 5.0, batchV2 beneficiary 7.5]
+  length result.results === 2
+  markers <- query @TestMarker provider
+  sort (map (\(_, m) -> m.weight) markers) === [5.0, 7.5]
+
+testRejectsEmptyBatch : Script ()
+testRejectsEmptyBatch = do
+  Setup{..} <- setup
+  submitMustFail provider $ exerciseCmd proxy BatchedMarkersProxy_CreateMarkers with
+    featuredAppRightCid = rightV1
+    batches = [batch provider beneficiary 0]
+  markerCount provider >>= (=== 0)
+
+testRejectsTooManyMarkers : Script ()
+testRejectsTooManyMarkers = do
+  Setup{..} <- setup
+  submitMustFail provider $ exerciseCmd proxy BatchedMarkersProxy_CreateMarkers with
+    featuredAppRightCid = rightV1
+    batches = [batch provider beneficiary 10001]
+  markerCount provider >>= (=== 0)
+
+testRejectsWeightBelowOne : Script ()
+testRejectsWeightBelowOne = do
+  Setup{..} <- setup
+  submitMustFail provider $ exerciseCmd proxy BatchedMarkersProxy_CreateMarkersV2 with
+    featuredAppRightCid = rightV2
+    batches = [batchV2 beneficiary 0.5]
+  markerCount provider >>= (=== 0)
+
+testRejectsForeignDso : Script ()
+testRejectsForeignDso = do
+  Setup{..} <- setup
+  otherDso <- allocateParty "other-dso"
+  otherProxy <- submit provider $ createCmd BatchedMarkersProxy with provider, dso = otherDso
+  submitMustFail provider $ exerciseCmd otherProxy BatchedMarkersProxy_CreateMarkers with
+    featuredAppRightCid = rightV1
+    batches = [batch provider beneficiary 1]
+  markerCount provider >>= (=== 0)
