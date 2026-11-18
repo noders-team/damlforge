@@ -84,7 +84,7 @@ template Asset
 
 The guide at [docs.damlforge.noders.services](https://docs.damlforge.noders.services)
 walks through DamlForge from setup to packaging. Every example in it compiles
-with `forge dar` and is covered by a passing Daml Script test.
+with `forge dar`.
 
 | # | Page | Covers |
 |---|---|---|
