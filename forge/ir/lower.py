@@ -20,7 +20,7 @@ from pathlib import Path
 
 from forge.ast import nodes as vy_ast
 from forge.ast.utils import type_aliases, type_var_names
-from forge.builtin_stubs import BUILTINS_DIR, scope_of, stub_scope
+from forge.builtin_stubs import BUILTINS_DIR, annotated_name, scope_of, stub_scope
 from forge.builtins import DamlName, choice, collect_daml_builtins
 from forge.builtins.maps import known_map_types
 from forge.exceptions import CompilerPanic
@@ -570,8 +570,11 @@ def _local_daml_renames(fn: vy_ast.FunctionDef) -> LocalNames:
         for statement in statements:
             bound.update(_bound_names(statement.target))
 
-    renames: list[LocalName] = []
+    renames = _annotated_arg_renames(fn)
     used = set(bound)
+    for entry in renames:
+        bound.discard(entry.source)
+        used.add(entry.target)
     for name in sorted(bound):
         if not name[:1].isupper():
             continue
@@ -586,10 +589,28 @@ def _local_daml_renames(fn: vy_ast.FunctionDef) -> LocalNames:
     return LocalNames(tuple(renames))
 
 
+def _annotated_arg_renames(fn: vy_ast.FunctionDef) -> list[LocalName]:
+    """Return the Daml names given to choice arguments by ``Annotated[..., DamlName]``."""
+    renames: list[LocalName] = []
+    if _choice_call(fn) is None:
+        return renames
+    for arg in fn.args.args:
+        daml_name = annotated_name(arg.annotation)
+        if daml_name is not None:
+            renames.append(LocalName(arg.arg, daml_name))
+    return renames
+
+
 def _rename_local_nodes(fn: vy_ast.FunctionDef, names: LocalNames) -> None:
-    statements = fn.body
-    for statement in statements:
-        name_nodes = statement.get_descendants(vy_ast.Name)
+    roots = list(fn.body)
+    call = _choice_call(fn)
+    if call is not None:
+        for keyword in call.keywords:
+            roots.append(keyword.value)
+    for root in roots:
+        name_nodes = list(root.get_descendants(vy_ast.Name))
+        if isinstance(root, vy_ast.Name):
+            name_nodes.append(root)
         for name_node in name_nodes:
             name_node.id = names.rename(name_node.id)
 
@@ -759,12 +780,13 @@ def _lower_aliases(module: vy_ast.Module, type_vars: set) -> tuple:
 
 
 def lower_struct(node: vy_ast.StructDef) -> IRStruct:
-    fields = tuple(
-        Field(stmt.target.id, lower_type(stmt.annotation))
-        for stmt in node.body
-        if isinstance(stmt, vy_ast.AnnAssign)
-    )
-    return IRStruct(node.name, fields, src=_src(node), params=_type_params(node))
+    scope = fields.current()
+    members = []
+    for stmt in node.body:
+        if isinstance(stmt, vy_ast.AnnAssign):
+            name = scope.keyword(node.name, stmt.target.id)
+            members.append(Field(name, lower_type(stmt.annotation)))
+    return IRStruct(node.name, tuple(members), src=_src(node), params=_type_params(node))
 
 
 def lower_enum(node: vy_ast.EnumDef) -> IREnum:

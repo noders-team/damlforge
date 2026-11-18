@@ -19,15 +19,19 @@ from pathlib import Path
 from typing import Optional
 
 from forge.ast import nodes as vy_ast
-from forge.builtin_stubs import BUILTINS_DIR
+from forge.builtin_stubs import BUILTINS_DIR, StubMetadata
 
 _SCOPE: ContextVar = ContextVar("field_scope", default=None)
 _CONTAINERS = (vy_ast.StructDef, vy_ast.TemplateDef, vy_ast.VariantDef, vy_ast.InterfaceDef)
 
 
 class FieldScope:
-    def __init__(self, renames: dict, user_fields: set, user_types: set):
-        self.renames = {k: v for k, v in renames.items() if k not in user_types}
+    def __init__(
+        self, renames: dict, user_fields: set, user_types: set, user_renames: Optional[dict] = None
+    ):
+        self.renames = {k: dict(v) for k, v in renames.items() if k not in user_types}
+        for owner, fields in (user_renames or {}).items():
+            self.renames.setdefault(owner, {}).update(fields)
         self.user_fields = user_fields
         targets: dict = {}
         for fields in self.renames.values():
@@ -73,9 +77,15 @@ def field_scope(module: vy_ast.Module):
         for info in stmt._metadata.get("import_infos", ())
         if BUILTINS_DIR not in Path(info.resolved_path).resolve().parents
     ]
+    user_renames: dict = {}
     for item in modules:
         _declarations(item, types, fields)
-    token = _SCOPE.set(FieldScope(collect_daml_builtins().type_field_renames, fields, types))
+        metadata = StubMetadata.of(item)
+        user_renames.update(metadata.type_field_renames)
+    for renamed in user_renames.values():
+        fields.difference_update(renamed)
+    builtin_renames = collect_daml_builtins().type_field_renames
+    token = _SCOPE.set(FieldScope(builtin_renames, fields, types, user_renames))
     try:
         yield
     finally:

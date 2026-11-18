@@ -3,7 +3,7 @@ PYTHON ?= python3
 
 LICENSE_MARKER := Licensed under the Apache License, Version 2.0
 
-.PHONY: test splice-dars build-examples dev dev-deps lint license-check clean clean-pyc clean-build clean-test build release
+.PHONY: test splice-dars build-examples test-examples dev dev-deps lint license-check clean clean-pyc clean-build clean-test build release
 
 init:
 	$(PYTHON) setup.py install
@@ -22,6 +22,14 @@ EXAMPLE_DIRS := crowd_loans splice-api-token-burn-mint-v1 splice-util-batched-ma
 build-examples: splice-dars
 	set -e; for ex in $(EXAMPLE_DIRS); do \
 		forge dar examples/$$ex -o examples/$$ex/$$ex-ci.dar; \
+	done
+
+SCRIPT_TEST_DIRS := splice-util-batched-markers-test splice-util-batched-markers-original-test
+
+test-examples: build-examples
+	cd examples/splice-util-batched-markers-original && dpm build
+	set -e; for ex in $(SCRIPT_TEST_DIRS); do \
+		(cd examples/$$ex && dpm test); \
 	done
 
 lint: mypy black flake8 isort

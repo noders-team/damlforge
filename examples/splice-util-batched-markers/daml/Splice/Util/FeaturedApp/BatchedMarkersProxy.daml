@@ -17,13 +17,13 @@ data BatchedMarkersProxy_CreateMarkersV2Result = BatchedMarkersProxy_CreateMarke
 data RewardBatch = RewardBatch
   with
     beneficiaries : [FeaturedAppRightV1.AppRewardBeneficiary]
-    num_markers : Int
+    numMarkers : Int
   deriving (Eq, Show)
 
 data RewardBatchV2 = RewardBatchV2
   with
     beneficiaries : [FeaturedAppRightV2.AppRewardBeneficiary]
-    marker_weight : Decimal
+    markerWeight : Decimal
   deriving (Eq, Show)
 
 collect_marker_beneficiaries : [RewardBatch] -> [Party]
@@ -71,22 +71,22 @@ template BatchedMarkersProxy
 
     nonconsuming choice BatchedMarkersProxy_CreateMarkers : BatchedMarkersProxy_CreateMarkersResult
       with
-        featured_app_right_cid : ContractId FeaturedAppRightV1.FeaturedAppRight
+        featuredAppRightCid : ContractId FeaturedAppRightV1.FeaturedAppRight
         batches : [RewardBatch]
       observer [dso] ++ collect_marker_beneficiaries batches
       controller provider
       do
         let self = this
-        assertMsg "numMarkers > 0" (all (\batch -> batch.num_markers > 0) batches)
+        assertMsg "numMarkers > 0" (all (\batch -> batch.numMarkers > 0) batches)
         let total_markers = 0
         let (_damlforge_total_markers9, _damlforge__damlforge_post_batch710) =
               foldl
                 (\(total_markers, _damlforge_post_batch7) batch ->
-                  let _damlforge_total_markers8 = total_markers + batch.num_markers in
+                  let _damlforge_total_markers8 = total_markers + batch.numMarkers in
                   (_damlforge_total_markers8, Some batch))
                 (total_markers, None) batches
         assertMsg "sum numMarkers <= 10000" (_damlforge_total_markers9 <= 10000)
-        featured_app_right <- fetch featured_app_right_cid
+        featured_app_right <- fetch featuredAppRightCid
         let (featured_app_right_view : FeaturedAppRightV1.FeaturedAppRightView) = view featured_app_right
         assertMsg "DSO party on featured app right is correct" (featured_app_right_view.dso == self.dso)
         let (results : [[FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarkerResult]]) = []
@@ -97,10 +97,10 @@ template BatchedMarkersProxy
               _damlforge_batch_results12 <-
                 foldlA
                   (\batch_results _index -> do
-                    marker_result <- exercise featured_app_right_cid (FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker with beneficiaries = batch.beneficiaries)
+                    marker_result <- exercise featuredAppRightCid (FeaturedAppRightV1.FeaturedAppRight_CreateActivityMarker with beneficiaries = batch.beneficiaries)
                     let _damlforge_batch_results11 = batch_results <> [marker_result]
                     pure _damlforge_batch_results11)
-                  batch_results ([0 .. (batch.num_markers) - 1])
+                  batch_results ([0 .. (batch.numMarkers) - 1])
               let _damlforge_results13 = results <> [_damlforge_batch_results12]
               pure _damlforge_results13)
             results batches
@@ -108,29 +108,29 @@ template BatchedMarkersProxy
 
     nonconsuming choice BatchedMarkersProxy_CreateMarkersV2 : BatchedMarkersProxy_CreateMarkersV2Result
       with
-        featured_app_right_cid : ContractId FeaturedAppRightV2.FeaturedAppRight
+        featuredAppRightCid : ContractId FeaturedAppRightV2.FeaturedAppRight
         batches : [RewardBatchV2]
       observer [dso] ++ collect_marker_beneficiaries_v2 batches
       controller provider
       do
         let self = this
-        assertMsg "markerWeight >= 1.0" (all (\batch -> batch.marker_weight >= (1.0 : Decimal)) batches)
+        assertMsg "markerWeight >= 1.0" (all (\batch -> batch.markerWeight >= (1.0 : Decimal)) batches)
         let total_weight = (0.0 : Decimal)
         let (_damlforge_total_weight17, _damlforge__damlforge_post_batch1518) =
               foldl
                 (\(total_weight, _damlforge_post_batch15) batch ->
-                  let _damlforge_total_weight16 = total_weight + batch.marker_weight in
+                  let _damlforge_total_weight16 = total_weight + batch.markerWeight in
                   (_damlforge_total_weight16, Some batch))
                 (total_weight, None) batches
         assertMsg "sum numMarkers <= 10000.0" (_damlforge_total_weight17 <= (10000.0 : Decimal))
-        featured_app_right <- fetch featured_app_right_cid
+        featured_app_right <- fetch featuredAppRightCid
         let (featured_app_right_view : FeaturedAppRightV2.FeaturedAppRightView) = view featured_app_right
         assertMsg "DSO party on featured app right is correct" (featured_app_right_view.dso == self.dso)
         let (results : [FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarkerResult]) = []
         _damlforge_results20 <-
           foldlA
             (\results batch -> do
-              marker_result <- exercise featured_app_right_cid (FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarker with beneficiaries = batch.beneficiaries, weight = Some batch.marker_weight)
+              marker_result <- exercise featuredAppRightCid (FeaturedAppRightV2.FeaturedAppRight_CreateActivityMarker with beneficiaries = batch.beneficiaries, weight = Some batch.markerWeight)
               let _damlforge_results19 = results <> [marker_result]
               pure _damlforge_results19)
             results batches
